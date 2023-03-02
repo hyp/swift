@@ -92,3 +92,105 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   ASSERT_FALSE(emitFileWithContents(PCH, "garbage"));
   ASSERT_TRUE(importer->canReadPCH(PCH));
 }
+
+struct LibStdCxxInjectionVFS {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> vfs;
+    
+    LibStdCxxInjectionVFS(const llvm::Triple &triple = llvm::Triple("x86_64", "redhat", "linux")) {
+        vfs = new llvm::vfs::InMemoryFileSystem;
+        tripleString = llvm::Twine(triple.getArchName() + "-" + triple.getVendorName() + "-" + triple.getOSName()).str();
+        osString = triple.getOSName().str();
+        archString = triple.getArchName().str();
+    }
+
+    // Add root 4.8.2 GCC installation
+    LibStdCxxInjectionVFS &rootGCC4_8() {
+        newFile("/usr/lib/gcc/" + tripleString + "/4.8.2/crtbegin.o");
+        return *this;
+    }
+
+    // Add devtoolset installation.
+    LibStdCxxInjectionVFS &devtoolSet(StringRef version, StringRef dtName = "devtoolset") {
+        // Two files needed for clang to detect the right paths / files.
+        newFile(llvm::Twine("/opt/rh/"+ dtName + "-") + version + "/lib/gcc/" + tripleString + "/" + version + "/crtbegin.o");
+        newFile(llvm::Twine("/opt/rh/" + dtName + "-") + version + "/root/usr/lib/gcc/" + tripleString + "/" + version + "/crtbegin.o");
+
+        // Libstdc++ headers needed to detect libstdc++.
+        auto newCxxFile = [&](StringRef name) {
+            newFile(llvm::Twine("/opt/rh/" + dtName + "-") + version + "/root/usr/include/c++/" + version + "/" + name);
+        };
+        newCxxFile("string");
+        newCxxFile("cstdlib");
+        newCxxFile("vector");
+        return *this;
+    }
+
+    // Add a libstdc++ modulemap that's part of Swift's distribution.
+    LibStdCxxInjectionVFS &libstdCxxModulemap() {
+        newFile("/usr/lib/swift/" + osString + "/" + archString + "/libstdcxx.modulemap");
+        return *this;
+    }
+private:
+    std::string tripleString;
+    std::string osString;
+    std::string archString;
+        
+    void newFile(const llvm::Twine &path) {
+        vfs->addFile(path, 0,
+                        llvm::MemoryBuffer::getMemBuffer("\n"));
+    }
+};
+
+TEST(ClangImporterTest, libStdCxxInjectionTest) {
+    // Ignore this test on Windows hosts.
+    llvm::Triple Host(llvm::sys::getProcessTriple());
+    if (Host.isOSWindows())
+      GTEST_SKIP();
+
+    swift::LangOptions langOpts;
+    langOpts.EnableCXXInterop = true;
+    langOpts.Target = llvm::Triple("x86_64", "unknown", "linux", "gnu");
+    swift::SILOptions silOpts;
+    swift::TypeCheckerOptions typecheckOpts;
+    INITIALIZE_LLVM();
+    swift::SearchPathOptions searchPathOpts;
+    searchPathOpts.RuntimeResourcePath = "/usr/lib/swift";
+    swift::symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
+    swift::SourceManager sourceMgr;
+    swift::DiagnosticEngine diags(sourceMgr);
+    ClangImporterOptions options;
+    options.clangPath = "/usr/bin/clang";
+    std::unique_ptr<ASTContext> context(
+        ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts, options,
+                        symbolGraphOpts, sourceMgr, diags));
+
+    // Libstdc++ should be found in devtoolset-9
+    {
+        LibStdCxxInjectionVFS vfs;
+        vfs.devtoolSet("9").libstdCxxModulemap();
+        auto paths = swift::getClangInvocationFileMapping(*context, vfs.vfs);
+        ASSERT_TRUE(paths.size() == 2);
+        EXPECT_EQ(paths[0].first, "/opt/rh/devtoolset-9/root/usr/include/c++/9/module.modulemap");
+        EXPECT_EQ(paths[0].second, "/usr/lib/swift/linux/x86_64/libstdcxx.modulemap");
+    }
+
+    // Libstdc++ should be found in devtoolset-9 even with GCC 4.8 in root.
+    {
+        LibStdCxxInjectionVFS vfs;
+        vfs.rootGCC4_8().devtoolSet("9").libstdCxxModulemap();
+        auto paths = swift::getClangInvocationFileMapping(*context, vfs.vfs);
+        ASSERT_TRUE(paths.size() == 2);
+        EXPECT_EQ(paths[0].first, "/opt/rh/devtoolset-9/root/usr/include/c++/9/module.modulemap");
+        EXPECT_EQ(paths[0].second, "/usr/lib/swift/linux/x86_64/libstdcxx.modulemap");
+    }
+
+    // Libstdc++ should be found in devtoolset-12 even with GCC 4.8 in root.
+    {
+        LibStdCxxInjectionVFS vfs;
+        vfs.rootGCC4_8().devtoolSet("12", /*devtoolsetName=*/"gcc-toolset").devtoolSet("9").libstdCxxModulemap();
+        auto paths = swift::getClangInvocationFileMapping(*context, vfs.vfs);
+        ASSERT_TRUE(paths.size() == 2);
+        EXPECT_EQ(paths[0].first, "/opt/rh/gcc-toolset-12/root/usr/include/c++/12/module.modulemap");
+        EXPECT_EQ(paths[0].second, "/usr/lib/swift/linux/x86_64/libstdcxx.modulemap");
+    }
+}

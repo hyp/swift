@@ -17,6 +17,7 @@
 #define SWIFT_CLANG_IMPORTER_H
 
 #include "swift/AST/ClangModuleLoader.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 /// The maximum number of SIMD vector elements we currently try to import.
 #define SWIFT_MAX_IMPORTED_SIMD_ELEMENTS 4
@@ -578,6 +579,13 @@ namespace importer {
 bool requiresCPlusPlus(const clang::Module *module);
 
 } // namespace importer
+
+/// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
+/// We inject modulemaps for those libraries into their include directories
+/// to allow using them from Swift.
+SmallVector<std::pair<std::string, std::string>, 2>
+getClangInvocationFileMapping(ASTContext &ctx,
+                              llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr);
 
 } // end namespace swift
 

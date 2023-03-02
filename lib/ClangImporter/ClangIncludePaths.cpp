@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/Basic/Platform.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/ToolChain.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -25,7 +26,8 @@ using Path = SmallString<128>;
 
 static Optional<Path> getActualModuleMapPath(StringRef name,
                                              SearchPathOptions &Opts,
-                                             const llvm::Triple &triple) {
+                                             const llvm::Triple &triple,
+                                             const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   StringRef platform = swift::getPlatformNameForTriple(triple);
   StringRef arch = swift::getMajorArchitectureName(triple);
 
@@ -40,7 +42,7 @@ static Optional<Path> getActualModuleMapPath(StringRef name,
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
     // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (llvm::sys::fs::exists(result))
+    if (vfs->exists(result))
       return result;
   }
 
@@ -53,7 +55,7 @@ static Optional<Path> getActualModuleMapPath(StringRef name,
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
     // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (llvm::sys::fs::exists(result))
+    if (vfs->exists(result))
       return result;
   }
 
@@ -62,15 +64,15 @@ static Optional<Path> getActualModuleMapPath(StringRef name,
 
 /// Given an include path directory, returns a path to inject the module map to.
 /// If a module map already exists, returns `None`.
-static llvm::Optional<Path> getInjectedModuleMapPath(const Path &dir) {
+static llvm::Optional<Path> getInjectedModuleMapPath(const Path &dir, const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   Path legacyPath(dir);
   llvm::sys::path::append(legacyPath, "module.map");
-  if (llvm::sys::fs::exists(legacyPath))
+  if (vfs->exists(legacyPath))
     return None;
 
   Path path(dir);
   llvm::sys::path::append(path, "module.modulemap");
-  if (llvm::sys::fs::exists(path))
+  if (vfs->exists(path))
     return None;
 
   return path;
@@ -82,19 +84,20 @@ static llvm::Optional<Path> getInjectedModuleMapPath(const Path &dir) {
 /// compiling for, and is not included in the resource directory with the other
 /// implicit module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
 static Optional<Path>
-getGlibcModuleMapPath(SearchPathOptions &Opts, const llvm::Triple &triple) {
-  return getActualModuleMapPath("glibc.modulemap", Opts, triple);
+getGlibcModuleMapPath(SearchPathOptions &Opts, const llvm::Triple &triple, const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+  return getActualModuleMapPath("glibc.modulemap", Opts, triple,
+                                vfs);
 }
 
 static Optional<Path>
-getLibStdCxxModuleMapPath(SearchPathOptions &opts, const llvm::Triple &triple) {
-  return getActualModuleMapPath("libstdcxx.modulemap", opts, triple);
+getLibStdCxxModuleMapPath(SearchPathOptions &opts, const llvm::Triple &triple, const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+  return getActualModuleMapPath("libstdcxx.modulemap", opts, triple, vfs);
 }
 
 Optional<SmallString<128>>
 swift::getCxxShimModuleMapPath(SearchPathOptions &opts,
                                const llvm::Triple &triple) {
-  return getActualModuleMapPath("libcxxshim.modulemap", opts, triple);
+  return getActualModuleMapPath("libcxxshim.modulemap", opts, triple, llvm::vfs::getRealFileSystem());
 }
 
 static llvm::opt::InputArgList
@@ -104,11 +107,11 @@ parseClangDriverArgs(const clang::driver::Driver &clangDriver,
   return clangDriver.getOpts().ParseArgs(args, unused1, unused2);
 }
 
-static clang::driver::Driver createClangDriver(const ASTContext &ctx) {
+static clang::driver::Driver createClangDriver(const ASTContext &ctx, const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
       new clang::DiagnosticOptions());
   clang::driver::Driver clangDriver(ctx.ClangImporterOpts.clangPath,
-                                    ctx.LangOpts.Target.str(), *clangDiags);
+                                    ctx.LangOpts.Target.str(), *clangDiags, "clang LLVM compiler", vfs);
   return clangDriver;
 }
 
@@ -120,7 +123,8 @@ static clang::driver::Driver createClangDriver(const ASTContext &ctx) {
 /// \return a path without dots (`../`, './').
 static llvm::Optional<Path>
 findFirstIncludeDir(const llvm::opt::InputArgList &args,
-                    const ArrayRef<const char *> expectedFileNames) {
+                    const ArrayRef<const char *> expectedFileNames,
+                    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   // C++ stdlib paths are added as `-internal-isystem`.
   std::vector<std::string> includeDirs =
       args.getAllArgValues(clang::driver::options::OPT_internal_isystem);
@@ -135,7 +139,7 @@ findFirstIncludeDir(const llvm::opt::InputArgList &args,
     for (auto expectedFileName : expectedFileNames) {
       Path expectedFile(dir);
       llvm::sys::path::append(expectedFile, expectedFileName);
-      if (!llvm::sys::fs::exists(expectedFile)) {
+      if (!vfs->exists(expectedFile)) {
         allExpectedExist = false;
         break;
       }
@@ -151,12 +155,15 @@ findFirstIncludeDir(const llvm::opt::InputArgList &args,
 }
 
 static llvm::opt::InputArgList
-createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
+createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver,
+                const char *additionalArg = nullptr) {
   // Flags passed to Swift with `-Xcc` might affect include paths.
   std::vector<const char *> clangArgs;
   for (const auto &each : ctx.ClangImporterOpts.ExtraArgs) {
     clangArgs.push_back(each.c_str());
   }
+  if (additionalArg)
+      clangArgs.push_back(additionalArg);
   llvm::opt::InputArgList clangDriverArgs =
       parseClangDriverArgs(clangDriver, clangArgs);
   // If an SDK path was explicitly passed to Swift, make sure to pass it to
@@ -173,13 +180,13 @@ static bool shouldInjectGlibcModulemap(const llvm::Triple &triple) {
 }
 
 static SmallVector<std::pair<std::string, std::string>, 2>
-getGlibcFileMapping(ASTContext &ctx) {
+getGlibcFileMapping(ASTContext &ctx, const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
   if (!shouldInjectGlibcModulemap(triple))
     return {};
 
   // Extract the Glibc path from Clang driver.
-  auto clangDriver = createClangDriver(ctx);
+  auto clangDriver = createClangDriver(ctx, vfs);
   auto clangDriverArgs = createClangArgs(ctx, clangDriver);
 
   llvm::opt::ArgStringList includeArgStrings;
@@ -194,7 +201,7 @@ getGlibcFileMapping(ASTContext &ctx) {
   // modulemap are present.
   Path glibcDir;
   if (auto dir = findFirstIncludeDir(parsedIncludeArgs,
-                                     {"inttypes.h", "unistd.h", "stdint.h"})) {
+                                     {"inttypes.h", "unistd.h", "stdint.h"}, vfs)) {
     glibcDir = dir.value();
   } else {
     ctx.Diags.diagnose(SourceLoc(), diag::glibc_not_found, triple.str());
@@ -202,7 +209,7 @@ getGlibcFileMapping(ASTContext &ctx) {
   }
 
   Path actualModuleMapPath;
-  if (auto path = getGlibcModuleMapPath(ctx.SearchPathOpts, triple))
+  if (auto path = getGlibcModuleMapPath(ctx.SearchPathOpts, triple, vfs))
     actualModuleMapPath = path.value();
   else
     // FIXME: Emit a warning of some kind.
@@ -226,8 +233,37 @@ getGlibcFileMapping(ASTContext &ctx) {
   };
 }
 
+/// Find the directory in /opt/rh/ starting with gcc-toolset-* or
+/// devtoolset-* with the highest version number.
+static std::string findOptRHGCCToolset(const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+
+    std::string ChosenToolsetDir;
+    unsigned ChosenToolsetVersion = 0;
+    std::error_code EC;
+    for (llvm::vfs::directory_iterator LI = vfs->dir_begin("/opt/rh", EC),
+         LE; !EC && LI != LE; LI = LI.increment(EC)) {
+          StringRef ToolsetDir = llvm::sys::path::filename(LI->path());
+          unsigned ToolsetVersion;
+          if ((!ToolsetDir.startswith("gcc-toolset-") &&
+               !ToolsetDir.startswith("devtoolset-")) ||
+              ToolsetDir.substr(ToolsetDir.rfind('-') + 1)
+                  .getAsInteger(10, ToolsetVersion))
+            continue;
+    
+          if (ToolsetVersion > ChosenToolsetVersion) {
+            ChosenToolsetVersion = ToolsetVersion;
+            ChosenToolsetDir = "/opt/rh/" + ToolsetDir.str();
+          }
+        }
+    
+        if (ChosenToolsetVersion > 0)
+            return ChosenToolsetDir;
+    return "";
+}
+
 static SmallVector<std::pair<std::string, std::string>, 2>
-getLibStdCxxFileMapping(ASTContext &ctx) {
+getLibStdCxxFileMapping(ASTContext &ctx, const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
+                        StringRef gccToolsetDir = "") {
   assert(ctx.LangOpts.EnableCXXInterop &&
          "libstdc++ is only injected if C++ interop is enabled");
 
@@ -240,8 +276,11 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
     return {};
 
   // Extract the libstdc++ installation path from Clang driver.
-  auto clangDriver = createClangDriver(ctx);
-  auto clangDriverArgs = createClangArgs(ctx, clangDriver);
+  auto clangDriver = createClangDriver(ctx, vfs);
+  std::string gccToolchainArg;
+  if (!gccToolsetDir.empty())
+      gccToolchainArg = llvm::Twine("--gcc-toolchain=" + gccToolsetDir + "/root/usr").str();
+  auto clangDriverArgs = createClangArgs(ctx, clangDriver, /*additionalArg=*/ gccToolchainArg.empty() ? nullptr : gccToolchainArg.c_str());
 
   llvm::opt::ArgStringList stdlibArgStrings;
   const auto &clangToolchain =
@@ -252,15 +291,25 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
 
   Path cxxStdlibDir;
   if (auto dir = findFirstIncludeDir(parsedStdlibArgs,
-                                     {"cstdlib", "string", "vector"})) {
+                                     {"cstdlib", "string", "vector"}, vfs)) {
     cxxStdlibDir = dir.value();
   } else {
+      if (gccToolsetDir.empty() && vfs->exists("/opt/rh")) {
+          // If libstdc++ isn't found, retry to see if we can include it from
+          // the /opt/rh devtoolset. This is useful for distributions that
+          // have an old GCC installation without libstdc++ in / and devtoolset installed in /opt/rh, as then Swift in /usr/bin/swift can still
+          // find libstdc++ in /opt/rh. This makes the behavior of Swift consistent for a Swift binary running from /usr/bin or from /usr/local/bin. Without this, Swift in /usr/bin/swift
+          // wouldn't be able to find libstdc++ as clang would just see that we have GCC installed in /../ and it would not try the toolset path.
+          auto gccToolset = findOptRHGCCToolset(vfs);
+          if (!gccToolset.empty())
+              return getLibStdCxxFileMapping(ctx, vfs, gccToolset);
+      }
     ctx.Diags.diagnose(SourceLoc(), diag::libstdcxx_not_found, triple.str());
     return {};
   }
 
   Path actualModuleMapPath;
-  if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, triple))
+  if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, triple, vfs))
     actualModuleMapPath = path.value();
   else
     return {};
@@ -268,7 +317,7 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
   // Only inject the module map if it actually exists. It may not, for example
   // if `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
   // a Swift compiler not built for Linux targets.
-  if (!llvm::sys::fs::exists(actualModuleMapPath))
+  if (!vfs->exists(actualModuleMapPath))
     // FIXME: emit a warning of some kind.
     return {};
 
@@ -282,7 +331,7 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
   // Only inject the module map if the module does not already exist at
   // {sysroot}/usr/include/module.{map,modulemap}.
   Path injectedModuleMapPath;
-  if (auto path = getInjectedModuleMapPath(cxxStdlibDir))
+  if (auto path = getInjectedModuleMapPath(cxxStdlibDir, vfs))
     injectedModuleMapPath = path.value();
   else
     return {};
@@ -297,13 +346,15 @@ getLibStdCxxFileMapping(ASTContext &ctx) {
 }
 
 SmallVector<std::pair<std::string, std::string>, 2>
-swift::getClangInvocationFileMapping(ASTContext &ctx) {
+swift::getClangInvocationFileMapping(ASTContext &ctx,
+                                     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs) {
   SmallVector<std::pair<std::string, std::string>, 2> result;
-
-  result.append(getGlibcFileMapping(ctx));
+  if (!vfs)
+     vfs = llvm::vfs::getRealFileSystem();
+  result.append(getGlibcFileMapping(ctx, vfs));
 
   if (ctx.LangOpts.EnableCXXInterop) {
-    result.append(getLibStdCxxFileMapping(ctx));
+    result.append(getLibStdCxxFileMapping(ctx, vfs));
   }
   return result;
 }
