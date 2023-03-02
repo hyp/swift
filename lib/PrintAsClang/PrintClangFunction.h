@@ -13,7 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_PRINTCLANGFUNCTION_H
 #define SWIFT_PRINTASCLANG_PRINTCLANGFUNCTION_H
 
-#include "OutputLanguageMode.h"
+#include "ClangOutputOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"

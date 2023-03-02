@@ -13,7 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_DECLANDTYPEPRINTER_H
 #define SWIFT_PRINTASCLANG_DECLANDTYPEPRINTER_H
 
-#include "OutputLanguageMode.h"
+#include "ClangOutputOptions.h"
 
 #include "swift/AST/Type.h"
 // for OptionalTypeKind

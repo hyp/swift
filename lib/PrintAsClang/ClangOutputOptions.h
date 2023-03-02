@@ -1,4 +1,4 @@
-//===--- OutputLanguageMode.h - Output mode for clang printer ---*- C++ -*-===//
+//===--- ClangOutputOptions.h - Options for clang printer -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_PRINTASCLANG_OUTPUTLANGUAGEMODE_H
-#define SWIFT_PRINTASCLANG_OUTPUTLANGUAGEMODE_H
+#ifndef SWIFT_PRINTASCLANG_CLANGOUTPUTOPTIONS_H
+#define SWIFT_PRINTASCLANG_CLANGOUTPUTOPTIONS_H
 
 namespace swift {
 

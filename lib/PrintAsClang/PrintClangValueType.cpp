@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "PrintClangValueType.h"
+#include "ClangOutputOptions.h"
 #include "ClangSyntaxPrinter.h"
 #include "DeclAndTypePrinter.h"
-#include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "SwiftToClangInteropContext.h"
 #include "swift/AST/ASTMangler.h"

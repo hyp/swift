@@ -13,7 +13,6 @@
 #include "PrintClangFunction.h"
 #include "ClangSyntaxPrinter.h"
 #include "DeclAndTypePrinter.h"
-#include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangClassType.h"
 #include "PrintClangValueType.h"
