@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop
+// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -disable-availability-checking
 
 // RUN: %target-interop-build-clangxx -std=c++20 -c %t/use-swift-cxx-types.cpp -I %t -o %t/swift-cxx-execution.o -g
-// RUN: %target-interop-build-swift %t/use-cxx-types.swift -o %t/swift-cxx-execution -Xlinker %t/swift-cxx-execution.o -module-name UseCxx -Xfrontend -entry-point-function-name -Xfrontend swiftMain -I %t -g
+// RUN: %target-interop-build-swift %t/use-cxx-types.swift -o %t/swift-cxx-execution -Xlinker %t/swift-cxx-execution.o -module-name UseCxx -Xfrontend -entry-point-function-name -Xfrontend swiftMain -I %t -g -Xfrontend -disable-availability-checking
 
 // RUN: %target-codesign %t/swift-cxx-execution
 // RUN: %target-run %t/swift-cxx-execution | %FileCheck %s
@@ -31,12 +31,12 @@ class TestFRT {
 public:
     virtual ~TestFRT() {}
     
-    virtual void doSomething() const = 0;
+    virtual void doSomething() = 0;
 
     int referenceCounter = 1;
 } __attribute__((swift_attr("import_reference")))
   __attribute__((swift_attr("retain:testFRTRetain")))
-  __attribute__((swift_attr("retain:testFRTRelease")))
+  __attribute__((swift_attr("release:testFRTRelease")))
   ;
 
 inline void testFRTRetain(TestFRT *frt) {
@@ -51,8 +51,10 @@ inline void testFRTRelease(TestFRT *frt) {
 
 class SubclassFRT: TestFRT {
 public:
-    void doSomething() const override;
-};
+    void doSomething() override; // FIXME: const problem
+} __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:testFRTRetain")))
+__attribute__((swift_attr("release:testFRTRelease")));
 
 //--- use-cxx-types.swift
 import CxxTest

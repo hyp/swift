@@ -1187,7 +1187,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           os << ">::getTypeMetadata()";
           return;
         }
-        paramName = "*this";
+          if (param.getInterfaceType()->isForeignReferenceType()) {
+              paramName = "this ";
+          } else {
+              
+              paramName = "*this";
+          }
       } else if (param.getName().empty()) {
         llvm::raw_string_ostream paramOS(paramName);
         paramOS << "_" << paramIndex;
