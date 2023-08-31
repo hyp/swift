@@ -561,6 +561,17 @@ static std::string computeMacroGuard(const ModuleDecl *M) {
   return (llvm::Twine(M->getNameStr().upper()) + "_SWIFT_H").str();
 }
 
+void writeHeaderPrologue(raw_ostream &os, ASTContext &context) {
+    writePrologue(os, context, "GEN_HDR");
+    // FIXME: where does the interop header come from.
+    ClangSyntaxPrinter(os).printIncludeForShimHeader(
+        "_SwiftCxxInteroperability.h");
+}
+
+void writeHeaderEpilogue(raw_ostream &os) {
+    writeEpilogue(os);
+}
+
 bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
                                StringRef bridgingHeader,
                                const FrontendOptions &frontendOpts,

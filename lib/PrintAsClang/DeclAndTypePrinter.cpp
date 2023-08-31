@@ -395,6 +395,12 @@ private:
   void visitExtensionDecl(ExtensionDecl *ED) {
     if (isEmptyExtensionDecl(ED))
       return;
+      
+      if (outputLang == OutputLanguageMode::Cxx) {
+          // FIXME: only special case.
+          printMembers(ED->getMembers());
+          return;
+      }
 
     auto baseClass = ED->getSelfClassDecl();
 
@@ -2986,4 +2992,31 @@ DeclAndTypePrinter::maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
     return StringRef();
 
   return name;
+}
+
+std::string testExtPrinter(ModuleDecl &mod, const IRGenOptions &irOpts,
+                    const ExtensionDecl *ed) {
+    std::string rawOS;
+    llvm::raw_string_ostream os(rawOS);
+    std::string prologueOSStr;
+    llvm::raw_string_ostream prologueOS(prologueOSStr);
+    std::string outOfLineDefinitionsOSStr;
+    llvm::raw_string_ostream outOfLineDefinitionsOS(outOfLineDefinitionsOSStr);
+    swift::DeclAndTypePrinter::DelayedMemberSet delayed;
+    CxxDeclEmissionScope scope;
+    PrimitiveTypeMapping typeMapping;
+    SwiftToClangInteropContext ctx(mod, irOpts);
+    llvm::StringSet exposedMoudles;
+    DeclAndTypePrinter printer(mod, os, prologueOS, outOfLineDefinitionsOS,
+                       delayed,
+                       scope,
+                               typeMapping,
+                               ctx,
+                       AccessLevel::Public, /*requiresExposedAttribute=*/false,
+                               exposedMoudles,
+                               OutputLanguageMode::Cxx);
+    printer.print(ed);
+    // FIXME: can we drop the Os str?
+    
+    return "namespace _impl { \n" + prologueOS.str() + "}\n" + outOfLineDefinitionsOS.str();
 }

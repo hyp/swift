@@ -1390,7 +1390,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   if (isDefinition)
     modifiers.qualifierContext = typeDeclContext;
   modifiers.isStatic = (isStatic || isConstructor) && !isDefinition;
-  modifiers.isInline = true;
+    modifiers.isInline = false; // FIXME: true;
   bool isMutating =
       isa<FuncDecl>(FD) ? cast<FuncDecl>(FD)->isMutating() : false;
   modifiers.isConst = !isa<ClassDecl>(typeDeclContext) && !isMutating &&

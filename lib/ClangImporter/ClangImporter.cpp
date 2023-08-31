@@ -1810,6 +1810,35 @@ bool ClangImporter::emitBridgingPCH(
   return false;
 }
 
+#include "clang/CodeGen/CodeGenAction.h"
+
+std::unique_ptr<llvm::Module> ClangImporter::emitCompiledIR(StringRef path, llvm::LLVMContext *context) {
+    auto emitInstance = cloneCompilerInstanceForPrecompiling();
+    auto &invocation = emitInstance->getInvocation();
+
+    auto LangOpts = invocation.getLangOpts();
+
+    auto language = getLanguageFromOptions(LangOpts);
+    auto inputFile = clang::FrontendInputFile(llvm::MemoryBufferRef(path, "<cxx-implementation>"), language);
+
+    auto &FrontendOpts = invocation.getFrontendOpts();
+    FrontendOpts.Inputs = {inputFile};
+    FrontendOpts.ProgramAction = clang::frontend::EmitLLVMOnly;
+
+    auto action = std::make_unique<clang::EmitLLVMOnlyAction>(context);
+    emitInstance->ExecuteAction(*action);
+    auto mod = action->takeModule();
+    if (mod) {
+        return mod;
+    }
+
+    if (emitInstance->getDiagnostics().hasErrorOccurred()) {
+        llvm::outs() << "Error building mod!";
+        return nullptr;
+    }
+    return nullptr;
+}
+
 bool ClangImporter::runPreprocessor(
     StringRef inputPath, StringRef outputPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();

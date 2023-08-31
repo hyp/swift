@@ -23,6 +23,7 @@
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "swift/ClangImporter/ClangImporter.h"
 
 using namespace swift;
 using namespace irgen;
@@ -282,6 +283,16 @@ IRGenModule::getAddrOfClangGlobalDecl(clang::GlobalDecl global,
   return ClangCodeGen->GetAddrOfGlobal(global, (bool) forDefinition);
 }
 
+#include "clang/Frontend/CompilerInstance.h"
+#include "llvm/Linker/Linker.h"
+
+std::string testExtPrinter(ModuleDecl &mod, const IRGenOptions &irOpts,
+                    const ExtensionDecl *ed);
+
+void writeHeaderPrologue(raw_ostream &os, ASTContext &context);
+
+void writeHeaderEpilogue(raw_ostream &os);
+
 void IRGenModule::finalizeClangCodeGen() {
   // FIXME: We try to avoid looking for PragmaCommentDecls unless we need to,
   // since clang::DeclContext::decls_begin() can trigger expensive
@@ -299,7 +310,55 @@ void IRGenModule::finalizeClangCodeGen() {
       }
     }
   }
-
+    
+    // FIXME: Let's act here!
+    if (Context.getModuleByName("UseCxx") != nullptr) {
+        
+        std::string srcFile;
+        llvm::raw_string_ostream osStr(srcFile);
+        osStr << "#include \"header.h\"\n";
+        writeHeaderPrologue(osStr, Context);
+        
+        SmallVector<Decl *, 16> topDecls;
+        getSwiftModule()->getTopLevelDecls(topDecls);
+        for (auto &i : topDecls) {
+            // TODO: Which specific extension.
+            if (auto *ed = dyn_cast<ExtensionDecl>(i)) {
+                //ed->dump();
+                auto src = testExtPrinter(*getSwiftModule(), IRGen.Opts, ed);
+                osStr << src;
+            }
+        }
+        writeHeaderEpilogue(osStr);
+        
+        llvm::outs() << "here we are!\n";
+        StringRef src = osStr.str();
+        llvm::outs() << src;
+        auto mod = static_cast<ClangImporter *>(Context.getClangModuleLoader())->emitCompiledIR(src, &getLLVMContext());
+        if (mod) {
+            llvm::errs() << "GOt mod!\n";
+            // Drop llvm.module.flags from CLang IR module.
+            auto flags = mod->getNamedMetadata("llvm.module.flags");
+            flags->dropAllReferences();
+            // LInk in the emitted clang IR module.
+            auto Err = llvm::Linker::linkModules(Module, std::move(mod));
+            if (Err) {
+                llvm::errs() << "Failed to link in the mdoule!\n";
+            }
+        }
+    }
+    
+    
+    
+    //auto imp= ClangImporter::create(Context);
+    //auto * ctx = &imp->getClangASTContext();
+    //ctx->getTranslationUnitDecl()->dump();
+    
+    
+    
+    
+    //ClangCodeGen->HandleTranslationUnit(*const_cast<clang::ASTContext *>(ctx));
+    
   ClangCodeGen->HandleTranslationUnit(
       *const_cast<clang::ASTContext *>(ClangASTContext));
 }

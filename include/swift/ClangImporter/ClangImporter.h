@@ -30,6 +30,8 @@ namespace llvm {
     class FileSystem;
     class OutputBackend;
   }
+class LLVMContext;
+class Module;
 }
 
 namespace clang {
@@ -400,6 +402,8 @@ public:
   /// \sa clang::GeneratePCHAction
   bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath,
                        bool cached);
+    
+  std::unique_ptr<llvm::Module> emitCompiledIR(StringRef path, llvm::LLVMContext *context);
 
   /// Returns true if a clang CompilerInstance can successfully read in a PCH,
   /// assuming it exists, with the current options. This can be used to find out
