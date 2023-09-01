@@ -148,7 +148,7 @@ public func testCast(_ x: OSObject) {
 }*/
 
 @_cxxImplementation
-extension TestClass /*: Cxx.Implementation */ {
+extension TestClass {
     public func testMe(y: CInt) {
         print("Don't thread on me mr \(x) , \(y)!")
     }
@@ -158,7 +158,7 @@ extension TestClass /*: Cxx.Implementation */ {
     }
 }
 
-/*@_cxxImplementation*/
+@_cxxImplementation
 extension SubclassFRT {
     public func doSomething() {
         print("subclass is doing something")
@@ -176,6 +176,7 @@ int main() {
   x.testMe(11);
   assert(x.mutateAndReturn(22) == 42);
   assert(x.x == 64);
+    
     SubclassFRT frt;
     frt.doSomething();
   return 0;

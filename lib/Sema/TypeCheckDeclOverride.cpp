@@ -1629,6 +1629,7 @@ namespace  {
 
     UNINTERESTING_ATTR(MacroRole)
     UNINTERESTING_ATTR(LexicalLifetimes)
+    UNINTERESTING_ATTR(CxxImplementation)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

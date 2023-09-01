@@ -746,7 +746,14 @@ DECL_ATTR_KINDS = [
                   UserInaccessible,
                   ABIBreakingToAdd, ABIBreakingToRemove,
                   APIStableToAdd, APIStableToRemove,
-                  code=146)
+                  code=146),
+
+    SimpleDeclAttribute('_cxxImplementation', 'CxxImplementation',
+                        OnExtension,
+                        UserInaccessible,
+                        ABIBreakingToAdd, ABIBreakingToRemove,
+                        APIBreakingToAdd, APIBreakingToRemove,
+                        code=147)
 ]
 
 # Schema for declaration modifiers:

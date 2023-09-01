@@ -350,6 +350,8 @@ public:
   void visitMacroRoleAttr(MacroRoleAttr *attr);
   
   void visitRawLayoutAttr(RawLayoutAttr *attr);
+
+  void visitCxxImplementationAttr(CxxImplementationAttr *attr);
 };
 
 } // end anonymous namespace
@@ -7229,6 +7231,17 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
   
   // The storage is not directly referenceable by stored properties.
   sd->setHasUnreferenceableStorage(true);
+}
+
+void AttributeChecker::visitCxxImplementationAttr(CxxImplementationAttr *attr) {
+    // Can only apply to structs.
+    auto ed = dyn_cast<ExtensionDecl>(D);
+    if (!ed) {
+      diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
+                            attr, "extension");
+      return;
+    }
+    // FIXME: diagnose.
 }
 
 namespace {
