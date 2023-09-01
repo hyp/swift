@@ -3025,7 +3025,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
           SILExtInfoBuilder(
               baseExtInfo.intoBuilder().withClangFunctionType(clangType), false)
               .build();
-
+//test
       return ::getNativeSILFunctionType(TC, forExpansion, origType, substFnType,
                                         silExtInfo, llvm::None, llvm::None,
                                         llvm::None, {});
@@ -3140,6 +3140,9 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
     CanType visitType(CanType substType) {
       // Lower the object type of optional types.
       if (auto substObjectType = substType.getOptionalObjectType()) {
+          //bool lower = substObjectType->isForeignReferenceType() &&
+          //origType.isClangType() && !origType.getType()->isOptional();
+          //if (!lower)
         return computeLoweredOptionalType(TC, forExpansion, origType, substType,
                                           substObjectType);
       }

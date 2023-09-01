@@ -422,7 +422,7 @@ private:
   bool evaluate(Evaluator &evaluator, SafeUseOfCxxDeclDescriptor desc) const;
 };
 
-enum class CustomRefCountingOperationKind { retain, release };
+enum class CustomRefCountingOperationKind { retain, release, downcast };
 
 struct CustomRefCountingOperationDescriptor final {
   const ClassDecl *decl;

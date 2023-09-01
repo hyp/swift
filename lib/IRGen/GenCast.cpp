@@ -31,6 +31,7 @@
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -172,6 +173,17 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // Emit the value we're casting from.
   if (from->getType() != IGF.IGM.Int8PtrTy)
     from = IGF.Builder.CreateBitOrPointerCast(from, IGF.IGM.Int8PtrTy);
+
+  if (toType->isForeignReferenceType()) {
+      auto downcastFn =
+          evaluateOrDefault(
+              IGF.IGM.Context.evaluator,
+              CustomRefCountingOperation(
+                  {toType->getClassOrBoundGenericClass(), CustomRefCountingOperationKind::downcast}),
+              {})
+              .operation;
+      return IGF.emitForeignReferenceTypeDowncast(toType->getClassOrBoundGenericClass(), downcastFn, from);
+  }
 
   // Emit a reference to the metadata and figure out what cast
   // function to use.

@@ -1735,3 +1735,26 @@ void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
   auto call = Builder.CreateCall(llvmFn->getFunctionType(), llvmFn, value);
   call->setDoesNotThrow();
 }
+
+llvm::Value *IRGenFunction::emitForeignReferenceTypeDowncast(ClassDecl *toTypeClassDecl,
+                                              ValueDecl *fn,
+                                              llvm::Value *value) {
+    assert(fn->getClangDecl() && isa<clang::FunctionTemplateDecl>(fn->getClangDecl()));
+    auto clangFn = cast<clang::FunctionTemplateDecl>(fn->getClangDecl());
+    clangFn->dump();
+    
+    SubstitutionMap subst = SubstitutionMap::get(cast<FuncDecl>(fn)->getGenericSignature(), {toTypeClassDecl->getDeclaredType()}, {});
+    auto *fn2 = this->IGM.Context.getClangModuleLoader()->instantiateCXXFunctionTemplate(IGM.Context, const_cast<clang::FunctionTemplateDecl *>(clangFn), subst);
+    fn2->dump();
+    
+    auto llvmFn = cast<llvm::Function>(
+        IGM.getAddrOfClangGlobalDecl(fn2, ForDefinition));
+
+    auto argType =
+        cast<llvm::FunctionType>(llvmFn->getFunctionType())->getParamType(0);
+    value = Builder.CreateBitCast(value, argType);
+
+    auto call = Builder.CreateCall(llvmFn->getFunctionType(), llvmFn, value);
+    call->setDoesNotThrow();
+    return call;
+}

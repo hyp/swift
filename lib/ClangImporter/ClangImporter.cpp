@@ -6308,6 +6308,8 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
   // exit soon. Return something valid in the meantime.
   if (!newFn)
     return ConcreteDeclRef(decl);
+  llvm::errs() << "instantiate!\n";
+  newFn->dump();
 
   if (Impl.specializedFunctionTemplates.count(newFn))
     return ConcreteDeclRef(Impl.specializedFunctionTemplates[newFn]);
@@ -6321,7 +6323,7 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
       newDecl = rewriteIntegerTypes(subst, decl, fn);
     }
   }
-
+//test.
   if (auto fn = dyn_cast<FuncDecl>(decl)) {
     newDecl = addThunkForDependentTypes(fn, cast<FuncDecl>(newDecl));
   }
@@ -6973,6 +6975,44 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   auto swiftDecl = desc.decl;
   auto operation = desc.kind;
   auto &ctx = swiftDecl->getASTContext();
+        
+  if (operation == CustomRefCountingOperationKind::downcast) {
+      auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
+      if (!decl->hasAttrs())
+        return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
+
+      
+      StringRef opStr = "import_reference_hierarchy:";
+      
+          auto retainFnAttr =
+          llvm::find_if(decl->getAttrs(), [&opStr](auto *attr) {
+              if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+                  return swiftAttr->getAttribute().startswith(opStr);
+              return false;
+          });
+      if (retainFnAttr != decl->getAttrs().end()) {
+          auto name = cast<clang::SwiftAttrAttr>(*retainFnAttr)
+          ->getAttribute()
+              .drop_front(StringRef(opStr).size())
+              .str();
+          
+          llvm::SmallVector<ValueDecl *, 1> results;
+          auto *clangMod = decl->getOwningModule();
+          if (clangMod && clangMod->isSubModule())
+              clangMod = clangMod->getTopLevelModule();
+          auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(clangMod);
+          ctx.lookupInModule(parentModule, name, results);
+          
+
+          if (results.size() == 1) {
+              auto castFn = results.front();
+              return {CustomRefCountingOperationResult::foundOperation, results.front(),
+                      name};
+          }
+      }
+      
+      return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
+  }
 
   std::string operationStr = operation == CustomRefCountingOperationKind::retain
                                  ? "retain:"

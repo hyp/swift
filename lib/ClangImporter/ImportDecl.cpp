@@ -2151,10 +2151,36 @@ namespace {
         return alreadyImportedResult->second;
 
       auto loc = Impl.importSourceLoc(decl->getLocation());
-      if (recordHasReferenceSemantics(decl))
-        result = Impl.createDeclWithClangNode<ClassDecl>(
-            decl, AccessLevel::Public, loc, name, loc,
-            ArrayRef<InheritedEntry>{}, nullptr, dc, false);
+        if (recordHasReferenceSemantics(decl)) {
+            auto *cd = Impl.createDeclWithClangNode<ClassDecl>(
+                                                             decl, AccessLevel::Public, loc, name, loc,
+                                                             ArrayRef<InheritedEntry>{}, nullptr, dc, false);
+            if (auto *cxxRD = dyn_cast<clang::CXXRecordDecl>(decl)) {
+                llvm::errs() << name.str() << "A\n";
+                if (cxxRD->getNumBases() > 0 &&
+                    cxxRD->bases_begin()->getType()->getAsCXXRecordDecl() &&
+                    recordHasReferenceSemantics(cxxRD->bases_begin()->getType()->getAsCXXRecordDecl())) {
+                    llvm::errs() << name.str() << "B\n";
+                    auto superClass = Impl.importDecl(cxxRD->bases_begin()->getType()->getAsCXXRecordDecl(), Impl.CurrentVersion);
+                    if (superClass && isa<ClassDecl>(superClass)) {
+                        llvm::errs() << name.str() << "C\n";
+                        cast<ClassDecl>(superClass)->getDeclaredType()->dump();
+                        auto downcastFn =
+                            evaluateOrDefault(
+                                Impl.SwiftContext.evaluator,
+                                CustomRefCountingOperation(
+                                    {cd, CustomRefCountingOperationKind::downcast}),
+                                {})
+                                .operation;
+                        if (downcastFn)
+                        cd->setSuperclass(cast<ClassDecl>(superClass)->getDeclaredType());
+ 
+                    }
+                }
+                
+            }
+            result = cd;
+        }
       else
         result = Impl.createDeclWithClangNode<StructDecl>(
             decl, AccessLevel::Public, loc, name, loc, llvm::None, nullptr, dc);
