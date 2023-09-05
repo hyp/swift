@@ -22,164 +22,46 @@ module CxxTest {
 }
 
 //--- header.h
-class TestClass {
-public:
-    void testMe(int y) const;
-    
-    int mutateAndReturn(int y);
+#pragma once
 
-    int x;
+#include <string>
+
+class WebBrowserResourceLoader {
+public:
+    int loadResource(const std::string &name);
+    
+    bool isLoaded(int resourceID) const;
+
+    int resourceCounter = 0; // Note: field must be public for now.
 };
-
-class TestFRT {
-public:
-    virtual ~TestFRT() {}
-    
-    virtual void doSomething() = 0;
-
-    int referenceCounter = 1;
-} __attribute__((swift_attr("import_reference")))
-  __attribute__((swift_attr("retain:testFRTRetain")))
-  __attribute__((swift_attr("release:testFRTRelease")))
-  ;
-
-inline void testFRTRetain(TestFRT *frt) {
-    frt->referenceCounter++;
-}
-inline void testFRTRelease(TestFRT *frt) {
-    frt->referenceCounter--;
-    if (frt->referenceCounter == 0) {
-        delete frt;
-    }
-}
-
-class SubclassFRT: TestFRT {
-public:
-    void doSomething() override; // FIXME: const problem
-} __attribute__((swift_attr("import_reference")))
-__attribute__((swift_attr("retain:testFRTRetain")))
-__attribute__((swift_attr("release:testFRTRelease")));
-
-#define OSTypeID(type)   (type::metaClass)
-
-#define OSDynamicCast(type, inst)   \
-    ((type *) OSMetaClassBase::safeMetaCast((inst), OSTypeID(type)))
-
-
-
-struct OSMetaClass;
-
-
-
-struct OSMetaClassBase {
-
-    
-    static OSMetaClassBase *safeMetaCast(const OSMetaClassBase *inst,
-                                         const OSMetaClass *meta);
-    static OSMetaClassBase *requiredMetaCast(const OSMetaClassBase *inst,
-                                             const OSMetaClass *meta);
-    virtual ~OSMetaClassBase();
-    virtual void retain() const;
-    virtual void release() const;
-    
-
-    
-} __attribute__((swift_attr("import_reference")))
-  __attribute__((swift_attr("import_reference_hierarchy:osDynamicCastForSwift")))
-  __attribute__((swift_attr("retain:OSMetaClassBase_retain")))
-  __attribute__((swift_attr("release:OSMetaClassBase_release")));
-
-// This function is used to.
-template<class T>
-static inline T *osDynamicCastForSwift(OSMetaClassBase *inst) {
-    return OSDynamicCast(T, inst);
-}
-
-inline void OSMetaClassBase_retain(OSMetaClassBase *frt) {
-    frt->retain();
-}
-inline void OSMetaClassBase_release(OSMetaClassBase *frt) {
-    frt->release();
-}
-
-struct OSObject : public OSMetaClassBase {
-    virtual ~OSObject();
-
-    OSObject *getProperty(const char *name);
-    
-    OSObject *getAnotherFriend(int x);
-    
-    static const OSMetaClass * const metaClass;
-} __attribute__((swift_attr("import_reference")))
-__attribute__((swift_attr("import_reference_hierarchy:osDynamicCastForSwift")))
-  __attribute__((swift_attr("retain:OSMetaClassBase_retain")))
-  __attribute__((swift_attr("release:OSMetaClassBase_release")));
-
-template<class T>
-inline T osDynamicCast(const OSObject *value) {
-    return ((T) OSMetaClassBase::safeMetaCast(value, OSObject::metaClass)); // FIXME
-}
-
-
-struct OSString: public OSObject {
-    virtual ~OSString();
-
-    const char *getStr() {
-        return str;
-    }
-    
-    static const OSMetaClass * const metaClass;
-private:
-    const char *str = "test str";
-} __attribute__((swift_attr("import_reference")))
-__attribute__((swift_attr("import_reference_hierarchy:osDynamicCastForSwift")))
-  __attribute__((swift_attr("retain:OSMetaClassBase_retain")))
-  __attribute__((swift_attr("release:OSMetaClassBase_release")));
 
 //--- use-cxx-types.swift
 import CxxTest
-
-/*
-public func testCast(_ x: OSObject) {
-    guard let str = x as? OSString else {
-        return
-    }
-    let value = str.getStr()
-}*/
+import CxxStdlib
 
 @_cxxImplementation
-extension TestClass {
-    public func testMe(y: CInt) {
-        print("Don't thread on me mr \(x) , \(y)!")
+extension WebBrowserResourceLoader {
+    public mutating func loadResource(name: std.string) -> CInt {
+        print("Loading resource \(name)...")
+        resourceCounter += 1
+        // Call into Swift macOS SDK APIs here :)
+        return resourceCounter
     }
-    public mutating func mutateAndReturn(y: CInt) -> CInt {
-        x += y
-        return x - y
-    }
-}
 
-@_cxxImplementation
-extension SubclassFRT {
-    public func doSomething() {
-        print("subclass is doing something")
+    public func isLoaded(resourceID: CInt) -> Bool {
+        resourceID <= resourceCounter
     }
 }
-
-
 
 //--- use-swift-cxx-types.cpp
 #include "header.h"
 #include <assert.h>
+
 int main() {
-  TestClass x;
-  x.x = 42;
-  x.testMe(11);
-  assert(x.mutateAndReturn(22) == 42);
-  assert(x.x == 64);
-    
-    SubclassFRT frt;
-    frt.doSomething();
+  WebBrowserResourceLoader loader;
+  int id = loader.loadResource("hello.world.avi");
+  assert(loader.isLoaded(id));
   return 0;
 }
-// CHECK: Don't thread on me mr 42 , 11!
-// CHECK: subclass is doing something
+
+// CHECK: Loading resource hello.world.avi...

@@ -327,7 +327,7 @@ void IRGenModule::finalizeClangCodeGen() {
         if (!exts.empty()) {
             std::string srcFile;
             llvm::raw_string_ostream osStr(srcFile);
-            osStr << "#include \"header.h\"\n";
+            osStr << "#include \"header.h\"\n#include <string>\n";
             writeHeaderPrologue(osStr, Context);
 
             for (auto ed : exts) {
