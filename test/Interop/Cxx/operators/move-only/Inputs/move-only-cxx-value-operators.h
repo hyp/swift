@@ -29,6 +29,8 @@ inline Name(int x) : x(x) {} \
 inline Name(const Name &) = delete; \
 inline Name(Name &&other) : x(std::move(other.x)) {}
 
+// operator *
+
 class NonCopyableHolderConstDeref {
     NONCOPYABLE_HOLDER_WRAPPER(NonCopyableHolderConstDeref)
 
@@ -58,6 +60,23 @@ class NonCopyableHolderValueMutDeref {
     NONCOPYABLE_HOLDER_WRAPPER(NonCopyableHolderValueMutDeref)
 
     inline NonCopyable operator *() { return NonCopyable(x.x); }
+};
+
+// operator []
+
+#define NONCOPYABLE_PAIR_HOLDER_WRAPPER(Name) \
+private: \
+NonCopyable x; \
+NonCopyable y; \
+public: \
+inline Name(int x, int y) : x(x), y(y) {} \
+inline Name(const Name &) = delete; \
+inline Name(Name &&other) : x(std::move(other.x)), y(std::move(y)) {}
+
+class NonCopyableHolderConstSubscript {
+    NONCOPYABLE_PAIR_HOLDER_WRAPPER(NonCopyableHolderConstSubscript)
+
+    inline const NonCopyable & operator [](int i) const { return i == 0? x : y; }
 };
 
 #endif // TEST_INTEROP_CXX_OPERATORS_MOVE_ONLY_OPS_H

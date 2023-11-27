@@ -1663,6 +1663,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   // generate both get & set accessors from it.
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
+  auto dc = getterImpl->getDeclContext();
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
@@ -1670,11 +1671,15 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   const auto elementTy = rawElementTy->getAnyPointerElementType()
                              ? rawElementTy->getAnyPointerElementType()
                              : rawElementTy;
+  // Use 'address' or 'mutableAddress' accessors for non-copyable
+  // types that are returned indirectly.
+  bool isImplicit = !elementTy->isNoncopyable(dc);
+  bool useAddress =
+    rawElementTy->getAnyPointerElementType() && elementTy->isNoncopyable(dc);
 
   auto &ctx = ImporterImpl.SwiftContext;
   auto bodyParams = getterImpl->getParameters();
   DeclName name(ctx, DeclBaseName::createSubscript(), bodyParams);
-  auto dc = getterImpl->getDeclContext();
 
   SubscriptDecl *subscript = SubscriptDecl::createImported(
       ctx, name, getterImpl->getLoc(), bodyParams, getterImpl->getLoc(),
@@ -1682,16 +1687,19 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   subscript->setAccess(AccessLevel::Public);
 
   AccessorDecl *getterDecl = AccessorDecl::create(
-      ctx, getterImpl->getLoc(), getterImpl->getLoc(), AccessorKind::Get,
+      ctx, getterImpl->getLoc(), getterImpl->getLoc(), useAddress ? AccessorKind::Address : AccessorKind::Get,
       subscript, SourceLoc(), subscript->getStaticSpelling(),
       /*async*/ false, SourceLoc(),
       /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
-      bodyParams, elementTy, dc);
+      bodyParams, useAddress ? elementTy->wrapInPointer(PTK_UnsafePointer) : elementTy, dc);
   getterDecl->setAccess(AccessLevel::Public);
+  if (isImplicit)
   getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
-  getterDecl->setBodySynthesizer(synthesizeUnwrappingGetterBody, getterImpl);
+  getterDecl->setBodySynthesizer(useAddress
+                                 ? synthesizeUnwrappingAddressGetterBody
+                                 : synthesizeUnwrappingGetterBody, getterImpl);
 
   if (getterImpl->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
