@@ -24,7 +24,7 @@ extension Array where Element: Differentiable {
     var _base: [Element]
   }
 }
-
+/*
 extension Array.DifferentiableView: Differentiable
 where Element: Differentiable {
   /// The viewed array.
@@ -471,3 +471,4 @@ extension Array where Element: Differentiable {
     })
   }
 }
+*/

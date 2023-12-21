@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
@@ -48,8 +49,456 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include <optional>
 
 using namespace swift;
+
+#if 1
+
+#if 0
+//===- llvm/ADT/SmallVector.cpp - 'Normally small' vectors ----------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// This file implements the SmallVector class.
+//
+//===----------------------------------------------------------------------===//
+#pragma optimize( "", off )
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/MemAlloc.h"
+#include <cstdint>
+#ifdef LLVM_ENABLE_EXCEPTIONS
+#include <stdexcept>
+#endif
+using namespace llvm;
+
+// Check that no bytes are wasted and everything is well-aligned.
+namespace {
+// These structures may cause binary compat warnings on AIX. Suppress the
+// warning since we are only using these types for the static assertions below.
+#if defined(_AIX)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waix-compat"
+#endif
+struct Struct16B {
+  alignas(16) void *X;
+};
+struct Struct32B {
+  alignas(32) void *X;
+};
+#if defined(_AIX)
+#pragma GCC diagnostic pop
+#endif
+}
+static_assert(sizeof(SmallVector<void *, 0>) ==
+                  sizeof(unsigned) * 2 + sizeof(void *),
+              "wasted space in SmallVector size 0");
+static_assert(alignof(SmallVector<Struct16B, 0>) >= alignof(Struct16B),
+              "wrong alignment for 16-byte aligned T");
+static_assert(alignof(SmallVector<Struct32B, 0>) >= alignof(Struct32B),
+              "wrong alignment for 32-byte aligned T");
+static_assert(sizeof(SmallVector<Struct16B, 0>) >= alignof(Struct16B),
+              "missing padding for 16-byte aligned T");
+static_assert(sizeof(SmallVector<Struct32B, 0>) >= alignof(Struct32B),
+              "missing padding for 32-byte aligned T");
+static_assert(sizeof(SmallVector<void *, 1>) ==
+                  sizeof(unsigned) * 2 + sizeof(void *) * 2,
+              "wasted space in SmallVector size 1");
+
+static_assert(sizeof(SmallVector<char, 0>) ==
+                  sizeof(void *) * 2 + sizeof(void *),
+              "1 byte elements have word-sized type for size and capacity");
+
+/// Report that MinSize doesn't fit into this vector's size type. Throws
+/// std::length_error or calls report_fatal_error.
+[[noreturn]] static void report_size_overflow(size_t MinSize, size_t MaxSize);
+static void report_size_overflow(size_t MinSize, size_t MaxSize) {
+  std::string Reason = "SmallVector unable to grow. Requested capacity (" +
+                       std::to_string(MinSize) +
+                       ") is larger than maximum value for size type (" +
+                       std::to_string(MaxSize) + ")";
+#ifdef LLVM_ENABLE_EXCEPTIONS
+  throw std::length_error(Reason);
+#else
+ // report_fatal_error(Twine(Reason));
+#endif
+}
+
+/// Report that this vector is already at maximum capacity. Throws
+/// std::length_error or calls report_fatal_error.
+[[noreturn]] static void report_at_maximum_capacity(size_t MaxSize);
+static void report_at_maximum_capacity(size_t MaxSize) {
+  std::string Reason =
+      "SmallVector capacity unable to grow. Already at maximum size " +
+      std::to_string(MaxSize);
+#ifdef LLVM_ENABLE_EXCEPTIONS
+  throw std::length_error(Reason);
+#else
+  //report_fatal_error(Twine(Reason));
+#endif
+}
+
+// Note: Moving this function into the header may cause performance regression.
+template <class Size_T>
+static size_t getNewCapacity(size_t MinSize, size_t TSize, size_t OldCapacity) {
+  constexpr size_t MaxSize = std::numeric_limits<Size_T>::max();
+
+  // Ensure we can fit the new capacity.
+  // This is only going to be applicable when the capacity is 32 bit.
+  if (MinSize > MaxSize) ;
+    //report_size_overflow(MinSize, MaxSize);
+
+  // Ensure we can meet the guarantee of space for at least one more element.
+  // The above check alone will not catch the case where grow is called with a
+  // default MinSize of 0, but the current capacity cannot be increased.
+  // This is only going to be applicable when the capacity is 32 bit.
+  if (OldCapacity == MaxSize) ;
+    //report_at_maximum_capacity(MaxSize);
+
+  // In theory 2*capacity can overflow if the capacity is 64 bit, but the
+  // original capacity would never be large enough for this to be a problem.
+  size_t NewCapacity = 2 * OldCapacity + 1; // Always grow.
+  return std::clamp(NewCapacity, MinSize, MaxSize);
+}
+
+template <class Size_T>
+void *SmallVectorBase<Size_T>::replaceAllocation(void *NewElts, size_t TSize,
+                                                 size_t NewCapacity,
+                                                 size_t VSize) {
+  void *NewEltsReplace = llvm::safe_malloc(NewCapacity * TSize);
+  if (VSize)
+    memcpy(NewEltsReplace, NewElts, VSize * TSize);
+  free(NewElts);
+  return NewEltsReplace;
+}
+
+// Note: Moving this function into the header may cause performance regression.
+template <class Size_T>
+void *SmallVectorBase<Size_T>::mallocForGrow(void *FirstEl, size_t MinSize,
+                                             size_t TSize,
+                                             size_t &NewCapacity) {
+  NewCapacity = getNewCapacity<Size_T>(MinSize, TSize, this->capacity());
+  // Even if capacity is not 0 now, if the vector was originally created with
+  // capacity 0, it's possible for the malloc to return FirstEl.
+  void *NewElts = llvm::safe_malloc(NewCapacity * TSize);
+  if (NewElts == FirstEl)
+    NewElts = replaceAllocation(NewElts, TSize, NewCapacity);
+  return NewElts;
+}
+
+
+// Note: Moving this function into the header may cause performance regression.
+template <class Size_T>
+void SmallVectorBase<Size_T>::grow_pod(void *FirstEl, size_t MinSize,
+                                       size_t TSize) {
+  size_t NewCapacity = getNewCapacity<Size_T>(MinSize, TSize, this->capacity());
+  void *NewElts;
+  if (BeginX == FirstEl) {
+    NewElts = llvm::safe_malloc(NewCapacity * TSize);
+    if (NewElts == FirstEl)
+      NewElts = replaceAllocation(NewElts, TSize, NewCapacity);
+
+    // Copy the elements over.  No need to run dtors on PODs.
+    memcpy(NewElts, this->BeginX, size() * TSize);
+  } else {
+    // If this wasn't grown from the inline copy, grow the allocated space.
+    NewElts = llvm::safe_realloc(this->BeginX, NewCapacity * TSize);
+    if (NewElts == FirstEl)
+      NewElts = replaceAllocation(NewElts, TSize, NewCapacity, size());
+  }
+
+  this->BeginX = NewElts;
+  this->Capacity = NewCapacity;
+}
+
+template class llvm::SmallVectorBase<uint32_t>;
+
+// Disable the uint64_t instantiation for 32-bit builds.
+// Both uint32_t and uint64_t instantiations are needed for 64-bit builds.
+// This instantiation will never be used in 32-bit builds, and will cause
+// warnings when sizeof(Size_T) > sizeof(size_t).
+#if SIZE_MAX > UINT32_MAX
+template class llvm::SmallVectorBase<uint64_t>;
+
+// Assertions to ensure this #if stays in sync with SmallVectorSizeType.
+static_assert(sizeof(SmallVectorSizeType<char>) == sizeof(uint64_t),
+              "Expected SmallVectorBase<uint64_t> variant to be in use.");
+#else
+static_assert(sizeof(SmallVectorSizeType<char>) == sizeof(uint32_t),
+              "Expected SmallVectorBase<uint32_t> variant to be in use.");
+#endif
+
+#pragma optimize( "", on)
+
+
+using namespace swift;
+
+
+namespace swift {
+  class SwitchStmt;
+  namespace diag {
+
+
+
+  // Declare common diagnostics objects with their appropriate types.
+#define DIAG(KIND,ID,Options,Text,Signature) \
+     detail::DiagWithArguments<void Signature>::type ID;
+#define FIXIT(ID,Text,Signature) \
+    extern detail::StructuredFixItWithArguments<void Signature>::type ID;
+#include "swift/AST/DiagnosticsSema.def"
+  }
+}
+#endif
+
+class DiagnosticEngine2;
+  class InFlightDiagnostic2 {
+public:
+    DiagnosticEngine2 *Engine;
+    bool IsActive;
+
+    InFlightDiagnostic2(DiagnosticEngine2 &Engine)
+      : Engine(&Engine), IsActive(true) { }
+    
+    InFlightDiagnostic2(const InFlightDiagnostic2 &) = delete;
+    InFlightDiagnostic2 &operator=(const InFlightDiagnostic2 &) = delete;
+    InFlightDiagnostic2 &operator=(InFlightDiagnostic2 &&) = delete;
+
+    InFlightDiagnostic2(InFlightDiagnostic2 &&Other)
+      : Engine(Other.Engine), IsActive(Other.IsActive) {
+      Other.IsActive = false;
+    }
+    
+    ~InFlightDiagnostic2() {
+      if (IsActive)
+        flush();
+    }
+  
+    void flush();
+  };
+
+   /// Diagnostic - This is a specific instance of a diagnostic along with all of
+  /// the DiagnosticArguments that it requires. 
+  class Diagnostic2 {
+  public:
+    typedef DiagnosticInfo::FixIt FixIt;
+
+  private:
+    DiagID ID;
+    SmallVector<DiagnosticArgument, 3> Args;
+    SmallVector<CharSourceRange, 2> Ranges;
+    SmallVector<FixIt, 2> FixIts;
+    std::vector<Diagnostic> ChildNotes;
+    SourceLoc Loc;
+    bool IsChildNote = false;
+    const swift::Decl *Decl = nullptr;
+    DiagnosticBehavior BehaviorLimit = DiagnosticBehavior::Unspecified;
+
+    friend DiagnosticEngine;
+    friend class InFlightDiagnostic;
+
+
+  public:
+    // All constructors are intentionally implicit.
+    template<typename ...ArgTypes>
+    Diagnostic2(Diag<ArgTypes...> ID,
+               typename swift::detail::PassArgument<ArgTypes>::type... VArgs)
+      : ID(ID.ID) {
+      DiagnosticArgument DiagArgs[] = {
+        DiagnosticArgument(0), std::move(VArgs)... 
+      };
+      Args.append(DiagArgs + 1, DiagArgs + 1 + sizeof...(VArgs));
+
+    }
+
+    /*implicit*/Diagnostic2(DiagID ID, ArrayRef<DiagnosticArgument> Args)
+      : ID(ID), Args(Args.begin(), Args.end()) {}
+    
+    // Accessors.
+    DiagID getID() const { return ID; }
+    ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
+    ArrayRef<CharSourceRange> getRanges() const { return Ranges; }
+    ArrayRef<FixIt> getFixIts() const { return FixIts; }
+    ArrayRef<Diagnostic> getChildNotes() const { return ChildNotes; }
+    bool isChildNote() const { return IsChildNote; }
+    SourceLoc getLoc() const { return Loc; }
+    const class Decl *getDecl() const { return Decl; }
+    DiagnosticBehavior getBehaviorLimit() const { return BehaviorLimit; }
+
+    void setLoc(SourceLoc loc) { Loc = loc; }
+    void setIsChildNote(bool isChildNote) { IsChildNote = isChildNote; }
+    void setDecl(const class Decl *decl) { Decl = decl; }
+    void setBehaviorLimit(DiagnosticBehavior limit){ BehaviorLimit = limit; }
+
+    /// Returns true if this object represents a particular diagnostic.
+    ///
+    /// \code
+    /// someDiag.is(diag::invalid_diagnostic)
+    /// \endcode
+    template<typename ...OtherArgTypes>
+    bool is(Diag<OtherArgTypes...> Other) const {
+      return ID == Other.ID;
+    }
+
+    void addRange(CharSourceRange R) {
+      Ranges.push_back(R);
+    }
+
+    // Avoid copying the fix-it text more than necessary.
+    void addFixIt(FixIt &&F) {
+      FixIts.push_back(std::move(F));
+    }
+
+    void addChildNote(Diagnostic &&D);
+    void insertChildNote(unsigned beforeIndex, Diagnostic &&D);
+  };
+
+class DeclNameLoc2 {
+public:
+  const void *LocationInfo = nullptr;
+  unsigned NumArgumentLabels = 0;
+
+   enum {
+    BaseNameIndex = 0,
+  };
+
+  /// Retrieve a pointer to either the only source location that was
+  /// stored or to the array of source locations that was stored.
+  SourceLoc const * getSourceLocs() const {
+    if (NumArgumentLabels == 0) 
+      return reinterpret_cast<SourceLoc const *>(&LocationInfo);
+
+    return reinterpret_cast<SourceLoc const *>(LocationInfo);
+  }
+
+ /// Retrieve the location of the base name.
+  SourceLoc getBaseNameLoc() const {
+    return getSourceLocs()[BaseNameIndex];
+  }
+};
+
+class DiagnosticEngine2 {
+public:
+  std::optional<Diagnostic> ActiveDiagnostic;
+
+  DiagnosticEngine2() {}
+
+
+    InFlightDiagnostic2 diagnose(SourceLoc Loc, const Diagnostic &D) {
+      assert(!ActiveDiagnostic && "Already have an active diagnostic");
+      ActiveDiagnostic = D;
+      ActiveDiagnostic->setLoc(Loc);
+      return InFlightDiagnostic2(*this);
+    }
+
+    template<typename T>
+    InFlightDiagnostic2
+    diagnose(DeclNameLoc2 Loc, Diag<T> ID,
+              T args) {
+      return diagnose(Loc.getBaseNameLoc(), Diagnostic(ID, args));
+    }
+};
+
+struct DeclName2 {
+  uint64_t opaqueValue;
+};
+
+
+
+struct DeclNameRefWithLoc2 {
+  DeclName2 Name;
+  DeclNameLoc2 Loc;
+  uint64_t AccessorKind;
+};
+
+class DerivativeAttr2 final {
+public:
+  DeclNameRefWithLoc2 OriginalFunctionName;
+
+  DeclNameRefWithLoc2 getOriginalFunctionName() {
+    return OriginalFunctionName;
+  }
+};
+
+#pragma optimize( "", off )
+
+static void consumeFuncDecl(void *D) {
+
+}
+
+static DiagnosticEngine2 &getDiags() {
+  static DiagnosticEngine2 Diags;
+  return Diags;
+}
+
+void InFlightDiagnostic2::flush() {
+  getDiags().ActiveDiagnostic = std::nullopt;
+}
+
+void findAutoDiffOriginalFunctionDecl2(
+      DeclNameRefWithLoc2 funcNameWithLoc) {
+      auto funcName2 = funcNameWithLoc.Name;
+      auto op = funcName2.opaqueValue;
+      if (op == 0) {
+        printf("THIS IS WRONG!\n");
+        return;
+      }
+      printf("THIS IS CORREECT: %llu\n", op);
+}
+#pragma optimize( "", on )
+
+
+
+
+static bool typeCheckDerivativeAttr(DerivativeAttr2 *attr) {
+  auto originalName = attr->getOriginalFunctionName();
+  consumeFuncDecl(attr);
+  if (originalName.AccessorKind != 0) {
+      getDiags().diagnose(
+          originalName.Loc, diag::derivative_attr_unsupported_accessor_kind,
+          DescriptiveDeclKind::InitAccessor);
+      return true;
+  }
+
+  // Look up original function.
+  findAutoDiffOriginalFunctionDecl2(
+       originalName);
+       return true;
+}
+
+void test2() {
+  getDiags().diagnose(
+          SourceLoc(), diag::derivative_attr_not_in_same_file_as_original);
+      getDiags().diagnose(
+         DeclNameLoc2(), diag::derivative_attr_unsupported_accessor_kind,
+          DescriptiveDeclKind::InitAccessor);
+}
+
+#pragma optimize( "", off )
+
+static bool testFunc() {
+    DerivativeAttr2 attr2;
+  attr2.OriginalFunctionName.Name.opaqueValue = 0x1234BEEF4321;
+  attr2.OriginalFunctionName.AccessorKind = 0;
+  return typeCheckDerivativeAttr(&attr2);
+} // test.
+
+
+
+int main() {
+  //test2();
+  return testFunc();
+}
+//
+
+#pragma optimize( "", on )
+
+#endif
+
+#if 1
 
 namespace {
 /// This visits each attribute on a decl.  The visitor should return true if
@@ -5134,6 +5583,10 @@ enum class AbstractFunctionDeclLookupErrorKind {
   CandidateNotFunctionDeclaration
 };
 
+#pragma optimize( "", off )
+
+#pragma optimize( "", on )
+
 /// Returns the original function (in the context of a derivative or transpose
 /// function) declaration corresponding to the given base type (optional),
 /// function name, lookup context, and the expected original function type.
@@ -5157,6 +5610,11 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
         llvm::Optional<AbstractFunctionDeclLookupErrorKind>(
             AbstractFunctionDecl *)> &isValidCandidate,
     AnyFunctionType *expectedOriginalFnType) {
+      auto funcName2 = funcNameWithLoc.Name;
+    llvm::errs() << "lookup me!\n";
+    llvm::errs() << "'" << funcName2.getBaseName().getIdentifier().str() << "'\n";
+    return nullptr;
+
   assert(lookupContext);
   auto &ctx = lookupContext->getASTContext();
   auto &diags = ctx.Diags;
@@ -5172,14 +5630,19 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
   if (!baseType && lookupContext->isTypeContext())
     baseType = lookupContext->getSelfTypeInContext();
   if (baseType) {
+    llvm::errs() << "lookup member!\n";
+    llvm::errs() << "'" << funcName.getBaseName().getIdentifier().str() << "'\n";
     results = TypeChecker::lookupMember(lookupContext, baseType, funcName);
   } else {
+    llvm::errs() << "lookup unqual\n";
+    llvm::errs() << funcName.getBaseName().getIdentifier().str() << "\n";
     results = TypeChecker::lookupUnqualified(
         lookupContext, funcName, funcNameLoc.getBaseNameLoc(), lookupOptions);
   }
 
   // Error if no candidates were found.
   if (results.empty()) {
+    llvm::errs() << "this is terrible!\n";
     diags.diagnose(funcNameLoc, diag::cannot_find_in_scope, funcName,
                    funcName.isOperator());
     return nullptr;
@@ -5973,436 +6436,254 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   (void)attr->getParameterIndices();
 }
 
-/// Type-checks the given `@derivative` attribute `attr` on declaration `D`.
-///
-/// Effects are:
-/// - Sets the original function and parameter indices on `attr`.
-/// - Diagnoses errors.
-/// - Stores the attribute in `ASTContext::DerivativeAttrs`.
-///
-/// \returns true on error, false on success.
-static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
-  // Note: Implementation must be idempotent because it may be called multiple
-  // times for the same attribute.
-  Decl *D = attr->getOriginalDeclaration();
-  auto &Ctx = D->getASTContext();
-  auto &diags = Ctx.Diags;
-  // `@derivative` attribute requires experimental differentiable programming
-  // to be enabled.
-  if (checkIfDifferentiableProgrammingEnabled(attr, D))
-    return true;
-  auto *derivative = cast<FuncDecl>(D);
-  auto originalName = attr->getOriginalFunctionName();
+#endif
 
-  auto *derivativeInterfaceType =
-      derivative->getInterfaceType()->castTo<AnyFunctionType>();
+#if 0
 
-  // Perform preliminary `@derivative` declaration checks.
-  // The result type should be a two-element tuple.
-  // Either a value and pullback:
-  //     (value: R, pullback: (R.TangentVector) -> (T.TangentVector...)
-  // Or a value and differential:
-  //     (value: R, differential: (T.TangentVector...) -> (R.TangentVector)
-  auto derivativeResultType = derivative->getResultInterfaceType();
-  auto derivativeResultTupleType = derivativeResultType->getAs<TupleType>();
-  if (!derivativeResultTupleType ||
-      derivativeResultTupleType->getNumElements() != 2) {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_expected_result_tuple);
-    return true;
-  }
-  auto valueResultElt = derivativeResultTupleType->getElement(0);
-  auto funcResultElt = derivativeResultTupleType->getElement(1);
-  // Get derivative kind and derivative function identifier.
-  AutoDiffDerivativeFunctionKind kind;
-  if (valueResultElt.getName().str() != "value") {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_invalid_result_tuple_value_label);
-    return true;
-  }
-  if (funcResultElt.getName().str() == "differential") {
-    kind = AutoDiffDerivativeFunctionKind::JVP;
-  } else if (funcResultElt.getName().str() == "pullback") {
-    kind = AutoDiffDerivativeFunctionKind::VJP;
-  } else {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_invalid_result_tuple_func_label);
-    return true;
-  }
-  attr->setDerivativeKind(kind);
+class DiagnosticEngine2;
+  class InFlightDiagnostic2 {
+public:
+    DiagnosticEngine2 *Engine;
+    bool IsActive;
 
-  // Compute expected original function type and look up original function.
-  auto *originalFnType =
-      getDerivativeOriginalFunctionType(derivativeInterfaceType);
+    InFlightDiagnostic2(DiagnosticEngine2 &Engine)
+      : Engine(&Engine), IsActive(true) { }
+    
+    InFlightDiagnostic2(const InFlightDiagnostic2 &) = delete;
+    InFlightDiagnostic2 &operator=(const InFlightDiagnostic2 &) = delete;
+    InFlightDiagnostic2 &operator=(InFlightDiagnostic2 &&) = delete;
 
-  // Returns true if the derivative function and original function candidate are
-  // defined in compatible type contexts. If the derivative function and the
-  // original function candidate have different parents, return false.
-  auto hasValidTypeContext = [&](AbstractFunctionDecl *originalCandidate) {
-    // Check if both functions are top-level.
-    if (!derivative->getInnermostTypeContext() &&
-        !originalCandidate->getInnermostTypeContext())
-      return true;
-    // Check if both functions are defined in the same type context.
-    if (auto typeCtx1 = derivative->getInnermostTypeContext())
-      if (auto typeCtx2 = originalCandidate->getInnermostTypeContext()) {
-        return typeCtx1->getSelfNominalTypeDecl() ==
-               typeCtx2->getSelfNominalTypeDecl();
-      }
-    return derivative->getParent() == originalCandidate->getParent();
-  };
-
-  auto isValidOriginalCandidate = [&](AbstractFunctionDecl *originalCandidate)
-      -> llvm::Optional<AbstractFunctionDeclLookupErrorKind> {
-    // Error if the original candidate is a protocol requirement. Derivative
-    // registration does not yet support protocol requirements.
-    // TODO(TF-982): Allow default derivative implementations for protocol
-    // requirements.
-    if (isa<ProtocolDecl>(originalCandidate->getDeclContext()))
-      return AbstractFunctionDeclLookupErrorKind::CandidateProtocolRequirement;
-    // Error if the original candidate is not defined in a type context
-    // compatible with the derivative function.
-    if (!hasValidTypeContext(originalCandidate))
-      return AbstractFunctionDeclLookupErrorKind::CandidateWrongTypeContext;
-    // Error if the original candidate does not have the expected type.
-    if (!checkFunctionSignature(
-            cast<AnyFunctionType>(originalFnType->getCanonicalType()),
-            originalCandidate->getInterfaceType()->getCanonicalType()))
-      return AbstractFunctionDeclLookupErrorKind::CandidateTypeMismatch;
-    return llvm::None;
-  };
-
-  Type baseType;
-  if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
-    const auto options =
-        TypeResolutionOptions(llvm::None) | TypeResolutionFlags::AllowModule;
-    baseType = TypeResolution::resolveContextualType(
-        baseTypeRepr, derivative->getDeclContext(), options,
-        /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr,
-        /*packElementOpener*/ nullptr);
-  }
-  if (baseType && baseType->hasError())
-    return true;
-  auto lookupOptions = attr->getBaseTypeRepr()
-                           ? defaultMemberLookupOptions
-                           : defaultUnqualifiedLookupOptions;
-  auto derivativeTypeCtx = derivative->getInnermostTypeContext();
-  if (!derivativeTypeCtx)
-    derivativeTypeCtx = derivative->getParent();
-  assert(derivativeTypeCtx);
-
-  // Diagnose unsupported original accessor kinds.
-  // Currently, only getters and setters are supported.
-  if (originalName.AccessorKind.has_value()) {
-    if (*originalName.AccessorKind != AccessorKind::Get &&
-        *originalName.AccessorKind != AccessorKind::Set) {
-      attr->setInvalid();
-      diags.diagnose(
-          originalName.Loc, diag::derivative_attr_unsupported_accessor_kind,
-          getAccessorDescriptiveDeclKind(*originalName.AccessorKind));
-      return true;
+    InFlightDiagnostic2(InFlightDiagnostic2 &&Other)
+      : Engine(Other.Engine), IsActive(Other.IsActive) {
+      Other.IsActive = false;
     }
+    
+    ~InFlightDiagnostic2() {
+      if (IsActive)
+        flush();
+    }
+  
+    void flush();
+  };
+
+   /// Diagnostic - This is a specific instance of a diagnostic along with all of
+  /// the DiagnosticArguments that it requires. 
+  class Diagnostic2 {
+  public:
+    typedef DiagnosticInfo::FixIt FixIt;
+
+  private:
+    DiagID ID;
+    SmallVector<DiagnosticArgument, 3> Args;
+    SmallVector<CharSourceRange, 2> Ranges;
+    SmallVector<FixIt, 2> FixIts;
+    std::vector<Diagnostic> ChildNotes;
+    SourceLoc Loc;
+    bool IsChildNote = false;
+    const swift::Decl *Decl = nullptr;
+    DiagnosticBehavior BehaviorLimit = DiagnosticBehavior::Unspecified;
+
+    friend DiagnosticEngine;
+    friend class InFlightDiagnostic;
+
+  public:
+    // All constructors are intentionally implicit.
+    template<typename ...ArgTypes>
+    Diagnostic2(Diag<ArgTypes...> ID,
+               typename detail::PassArgument<ArgTypes>::type... VArgs)
+      : ID(ID.ID) {
+      DiagnosticArgument DiagArgs[] = {
+        DiagnosticArgument(0), std::move(VArgs)... 
+      };
+      Args.append(DiagArgs + 1, DiagArgs + 1 + sizeof...(VArgs));
+
+    }
+
+    /*implicit*/Diagnostic2(DiagID ID, ArrayRef<DiagnosticArgument> Args)
+      : ID(ID), Args(Args.begin(), Args.end()) {}
+    
+    // Accessors.
+    DiagID getID() const { return ID; }
+    ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
+    ArrayRef<CharSourceRange> getRanges() const { return Ranges; }
+    ArrayRef<FixIt> getFixIts() const { return FixIts; }
+    ArrayRef<Diagnostic> getChildNotes() const { return ChildNotes; }
+    bool isChildNote() const { return IsChildNote; }
+    SourceLoc getLoc() const { return Loc; }
+    const class Decl *getDecl() const { return Decl; }
+    DiagnosticBehavior getBehaviorLimit() const { return BehaviorLimit; }
+
+    void setLoc(SourceLoc loc) { Loc = loc; }
+    void setIsChildNote(bool isChildNote) { IsChildNote = isChildNote; }
+    void setDecl(const class Decl *decl) { Decl = decl; }
+    void setBehaviorLimit(DiagnosticBehavior limit){ BehaviorLimit = limit; }
+
+    /// Returns true if this object represents a particular diagnostic.
+    ///
+    /// \code
+    /// someDiag.is(diag::invalid_diagnostic)
+    /// \endcode
+    template<typename ...OtherArgTypes>
+    bool is(Diag<OtherArgTypes...> Other) const {
+      return ID == Other.ID;
+    }
+
+    void addRange(CharSourceRange R) {
+      Ranges.push_back(R);
+    }
+
+    // Avoid copying the fix-it text more than necessary.
+    void addFixIt(FixIt &&F) {
+      FixIts.push_back(std::move(F));
+    }
+
+    void addChildNote(Diagnostic &&D);
+    void insertChildNote(unsigned beforeIndex, Diagnostic &&D);
+  };
+
+class DeclNameLoc2 {
+public:
+  const void *LocationInfo = nullptr;
+  unsigned NumArgumentLabels = 0;
+
+   enum {
+    BaseNameIndex = 0,
+  };
+
+  /// Retrieve a pointer to either the only source location that was
+  /// stored or to the array of source locations that was stored.
+  SourceLoc const * getSourceLocs() const {
+    if (NumArgumentLabels == 0) 
+      return reinterpret_cast<SourceLoc const *>(&LocationInfo);
+
+    return reinterpret_cast<SourceLoc const *>(LocationInfo);
+  }
+
+ /// Retrieve the location of the base name.
+  SourceLoc getBaseNameLoc() const {
+    return getSourceLocs()[BaseNameIndex];
+  }
+};
+
+class DiagnosticEngine2 {
+public:
+  std::optional<Diagnostic> ActiveDiagnostic;
+
+  DiagnosticEngine2() {}
+
+
+    InFlightDiagnostic2 diagnose(SourceLoc Loc, const Diagnostic &D) {
+      assert(!ActiveDiagnostic && "Already have an active diagnostic");
+      ActiveDiagnostic = D;
+      ActiveDiagnostic->setLoc(Loc);
+      return InFlightDiagnostic2(*this);
+    }
+
+    template<typename T>
+    InFlightDiagnostic2
+    diagnose(DeclNameLoc2 Loc, Diag<T> ID,
+              T args) {
+      return diagnose(Loc.getBaseNameLoc(), Diagnostic(ID, args));
+    }
+};
+
+struct DeclName2 {
+  uint64_t opaqueValue;
+};
+
+
+
+struct DeclNameRefWithLoc2 {
+  DeclName2 Name;
+  DeclNameLoc2 Loc;
+  uint64_t AccessorKind;
+};
+
+class DerivativeAttr2 final {
+public:
+  DeclNameRefWithLoc2 OriginalFunctionName;
+
+  DeclNameRefWithLoc2 getOriginalFunctionName() {
+    return OriginalFunctionName;
+  }
+};
+
+#pragma optimize( "", off )
+void InFlightDiagnostic2::flush() {
+
+}
+static void consumeFuncDecl(void *D) {
+
+}
+
+static DiagnosticEngine2 &getDiags() {
+  static DiagnosticEngine2 Diags;
+  return Diags;
+}
+
+void findAutoDiffOriginalFunctionDecl2(
+      DeclNameRefWithLoc2 funcNameWithLoc) {
+      auto funcName2 = funcNameWithLoc.Name;
+      auto op = funcName2.opaqueValue;
+      if (op == 0) {
+        printf("THIS IS WRONG!\n");
+        return;
+      }
+      printf("THIS IS CORREECT: %llu\n", op);
+}
+#pragma optimize( "", on )
+
+
+
+
+static bool typeCheckDerivativeAttr(DerivativeAttr2 *attr) {
+  auto originalName = attr->getOriginalFunctionName();
+  consumeFuncDecl(attr);
+  if (originalName.AccessorKind != 0) {
+      getDiags().diagnose(
+          originalName.Loc, diag::derivative_attr_unsupported_accessor_kind,
+          DescriptiveDeclKind::InitAccessor);
+      return true;
   }
 
   // Look up original function.
-  auto *originalAFD = findAutoDiffOriginalFunctionDecl(
-      attr, baseType, originalName, derivativeTypeCtx, lookupOptions,
-      isValidOriginalCandidate, originalFnType);
-  if (!originalAFD) {
-    attr->setInvalid();
-    return true;
-  }
-
-  // Diagnose original stored properties. Stored properties cannot have custom
-  // registered derivatives.
-  if (auto *accessorDecl = dyn_cast<AccessorDecl>(originalAFD)) {
-    // Diagnose original stored properties. Stored properties cannot have custom
-    // registered derivatives.
-    auto *asd = accessorDecl->getStorage();
-    if (asd->hasStorage()) {
-      diags.diagnose(originalName.Loc,
-                     diag::derivative_attr_original_stored_property_unsupported,
-                     originalName.Name);
-      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here, asd);
-      return true;
-    }
-    // Diagnose original class property and subscript setters.
-    // TODO(https://github.com/apple/swift/issues/55542): Fix derivative function typing results regarding class-typed function parameters.
-    if (asd->getDeclContext()->getSelfClassDecl() &&
-        accessorDecl->getAccessorKind() == AccessorKind::Set) {
-      diags.diagnose(originalName.Loc,
-                     diag::derivative_attr_class_setter_unsupported);
-      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here, asd);
-      return true;
-    }
-  }
-
-  // Diagnose if original function has opaque result types.
-  if (auto *opaqueResultTypeDecl = originalAFD->getOpaqueResultTypeDecl()) {
-    diags.diagnose(
-        attr->getLocation(),
-        diag::autodiff_attr_opaque_result_type_unsupported);
-    attr->setInvalid();
-    return true;
-  }
-
-  // Diagnose if original function is an invalid class member.
-  bool isOriginalClassMember =
-      originalAFD->getDeclContext() &&
-      originalAFD->getDeclContext()->getSelfClassDecl();
-  if (isOriginalClassMember) {
-    auto *classDecl = originalAFD->getDeclContext()->getSelfClassDecl();
-    assert(classDecl);
-    // Class members returning dynamic `Self` are not supported.
-    // Dynamic `Self` is supported only as a single top-level result for class
-    // members. JVP/VJP functions returning `(Self, ...)` tuples would not
-    // type-check.
-    bool diagnoseDynamicSelfResult = originalAFD->hasDynamicSelfResult();
-    if (diagnoseDynamicSelfResult) {
-      // Diagnose class initializers in non-final classes.
-      if (isa<ConstructorDecl>(originalAFD)) {
-        if (!classDecl->isSemanticallyFinal()) {
-          diags.diagnose(attr->getLocation(),
-                         diag::derivative_attr_nonfinal_class_init_unsupported,
-                         classDecl->getDeclaredInterfaceType());
-          return true;
-        }
-      }
-      // Diagnose all other declarations returning dynamic `Self`.
-      else {
-        diags.diagnose(
-            attr->getLocation(),
-            diag::derivative_attr_class_member_dynamic_self_result_unsupported,
-            DeclNameRef(originalAFD->getName()));
-        return true;
-      }
-    }
-  }
-
-  attr->setOriginalFunction(originalAFD);
-
-  // Returns true if:
-  // - Original function and derivative function are static methods.
-  // - Original function and derivative function are non-static methods.
-  // - Original function is a Constructor declaration and derivative function is
-  // a static method.
-  auto compatibleStaticDecls = [&]() {
-    return (isa<ConstructorDecl>(originalAFD) || originalAFD->isStatic()) ==
-           derivative->isStatic();
-  };
-
-  // Diagnose if original function and derivative differ in terms of static declaration.
-  if (!compatibleStaticDecls()) {
-    bool derivativeMustBeStatic = !derivative->isStatic();
-    diags
-        .diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
-                  diag::derivative_attr_static_method_mismatch_original,
-                  originalAFD, derivative, derivativeMustBeStatic)
-        .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
-    diags.diagnose(originalAFD->getNameLoc(),
-                   diag::derivative_attr_static_method_mismatch_original_note,
-                   originalAFD, derivativeMustBeStatic);
-    auto fixItDiag =
-        diags.diagnose(derivative->getStartLoc(),
-                       diag::derivative_attr_static_method_mismatch_fix,
-                       derivative, derivativeMustBeStatic);
-    if (derivativeMustBeStatic) {
-      fixItDiag.fixItInsert(derivative->getStartLoc(), "static ");
-    } else {
-      fixItDiag.fixItRemove(derivative->getStaticLoc());
-    }
-    return true;
-  }
-
-  // Returns true if:
-  // - Original function and derivative function have the same access level.
-  // - Original function is public and derivative function is internal
-  //   `@usableFromInline`. This is the only special case.
-  auto compatibleAccessLevels = [&]() {
-    if (originalAFD->getFormalAccess() == derivative->getFormalAccess())
-      return true;
-    return originalAFD->getFormalAccess() == AccessLevel::Public &&
-           (derivative->getFormalAccess() == AccessLevel::Public ||
-            derivative->isUsableFromInline());
-  };
-
-  // Check access level compatibility for original and derivative functions.
-  if (!compatibleAccessLevels()) {
-    auto originalAccess = originalAFD->getFormalAccess();
-    auto derivativeAccess =
-        derivative->getFormalAccessScope().accessLevelForDiagnostics();
-    diags.diagnose(originalName.Loc,
-                   diag::derivative_attr_access_level_mismatch,
-                   originalAFD, originalAccess,
-                   derivative, derivativeAccess);
-    auto fixItDiag =
-        derivative->diagnose(diag::derivative_attr_fix_access, originalAccess);
-    // If original access is public, suggest adding `@usableFromInline` to
-    // derivative.
-    if (originalAccess == AccessLevel::Public) {
-      fixItDiag.fixItInsert(
-          derivative->getAttributeInsertionLoc(/*forModifier*/ false),
-          "@usableFromInline ");
-    }
-    // Otherwise, suggest changing derivative access level.
-    else {
-      fixItAccess(fixItDiag, derivative, originalAccess);
-    }
-    return true;
-  }
-
-  // Get the resolved differentiability parameter indices.
-  auto *resolvedDiffParamIndices = attr->getParameterIndices();
-
-  // Get the parsed differentiability parameter indices, which have not yet been
-  // resolved. Parsed differentiability parameter indices are defined only for
-  // parsed attributes.
-  auto parsedDiffParams = attr->getParsedParameters();
-
-  // If differentiability parameter indices are not resolved, compute them.
-  if (!resolvedDiffParamIndices)
-    resolvedDiffParamIndices = computeDifferentiabilityParameters(
-        parsedDiffParams, derivative, derivative->getGenericEnvironment(),
-        attr->getAttrName(), attr->getLocation());
-  if (!resolvedDiffParamIndices)
-    return true;
-
-  // Set the resolved differentiability parameter indices in the attribute.
-  // Differentiability parameter indices verification is done by
-  // `AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType` below.
-  attr->setParameterIndices(resolvedDiffParamIndices);
-
-  // Compute the expected differential/pullback type.
-  auto expectedLinearMapTypeOrError =
-      originalFnType->getAutoDiffDerivativeFunctionLinearMapType(
-          resolvedDiffParamIndices, kind.getLinearMapKind(),
-          LookUpConformanceInModule(derivative->getModuleContext()),
-          /*makeSelfParamFirst*/ true);
-
-  // Helper for diagnosing derivative function type errors.
-  auto errorHandler = [&](const DerivativeFunctionTypeError &error) {
-    attr->setInvalid();
-    switch (error.kind) {
-    case DerivativeFunctionTypeError::Kind::NoSemanticResults:
-      diags
-          .diagnose(attr->getLocation(),
-                    diag::autodiff_attr_original_void_result,
-                    originalAFD->getName())
-          .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
-      return;
-    case DerivativeFunctionTypeError::Kind::NoDifferentiabilityParameters:
-      diags.diagnose(attr->getLocation(),
-                     diag::diff_params_clause_no_inferred_parameters);
-      return;
-    case DerivativeFunctionTypeError::Kind::
-        NonDifferentiableDifferentiabilityParameter: {
-      auto nonDiffParam = error.getNonDifferentiableTypeAndIndex();
-      SourceLoc loc = parsedDiffParams.empty()
-                          ? attr->getLocation()
-                          : parsedDiffParams[nonDiffParam.second].getLoc();
-      diags.diagnose(loc, diag::diff_params_clause_param_not_differentiable,
-                     nonDiffParam.first);
-      return;
-    }
-    case DerivativeFunctionTypeError::Kind::NonDifferentiableResult:
-      auto nonDiffResult = error.getNonDifferentiableTypeAndIndex();
-      diags.diagnose(attr->getLocation(),
-                     diag::autodiff_attr_result_not_differentiable,
-                     nonDiffResult.first);
-      return;
-    }
-  };
-  // Diagnose any derivative function type errors.
-  if (!expectedLinearMapTypeOrError) {
-    auto error = expectedLinearMapTypeOrError.takeError();
-    handleAllErrors(std::move(error), errorHandler);
-    return true;
-  }
-  Type expectedLinearMapType = expectedLinearMapTypeOrError.get();
-  if (expectedLinearMapType->hasTypeParameter())
-    expectedLinearMapType =
-        derivative->mapTypeIntoContext(expectedLinearMapType);
-  if (expectedLinearMapType->hasArchetype())
-    expectedLinearMapType = expectedLinearMapType->mapTypeOutOfContext();
-
-  // Compute the actual differential/pullback type for comparison with the
-  // expected type. We must canonicalize the derivative interface type before
-  // extracting the differential/pullback type from it so that types are
-  // simplified via the canonical generic signature.
-  CanType canActualResultType = derivativeInterfaceType->getCanonicalType();
-  while (isa<AnyFunctionType>(canActualResultType)) {
-    canActualResultType =
-        cast<AnyFunctionType>(canActualResultType).getResult();
-  }
-  CanType actualLinearMapType =
-      cast<TupleType>(canActualResultType).getElementType(1);
-
-  // Check if differential/pullback type matches expected type.
-  if (!actualLinearMapType->isEqual(expectedLinearMapType)) {
-    // Emit differential/pullback type mismatch error on attribute.
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_result_func_type_mismatch,
-                   funcResultElt.getName(), originalAFD);
-    // Emit note with expected differential/pullback type on actual type
-    // location.
-    auto *tupleReturnTypeRepr =
-        cast<TupleTypeRepr>(derivative->getResultTypeRepr());
-    auto *funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
-    diags
-        .diagnose(funcEltTypeRepr->getStartLoc(),
-                  diag::derivative_attr_result_func_type_mismatch_note,
-                  funcResultElt.getName(), expectedLinearMapType)
-        .highlight(funcEltTypeRepr->getSourceRange());
-    // Emit note showing original function location, if possible.
-    if (originalAFD->getLoc().isValid())
-      diags.diagnose(originalAFD->getLoc(),
-                     diag::derivative_attr_result_func_original_note,
-                     originalAFD);
-    return true;
-  }
-
-  // Reject duplicate `@derivative` attributes.
-  auto &derivativeAttrs = Ctx.DerivativeAttrs[std::make_tuple(
-      originalAFD, resolvedDiffParamIndices, kind)];
-  derivativeAttrs.insert(attr);
-  if (derivativeAttrs.size() > 1) {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_original_already_has_derivative,
-                   originalAFD);
-    for (auto *duplicateAttr : derivativeAttrs) {
-      if (duplicateAttr == attr)
-        continue;
-      diags.diagnose(duplicateAttr->getLocation(),
-                     diag::derivative_attr_duplicate_note);
-    }
-    return true;
-  }
-
-  // Register derivative function configuration.
-  auto *resultIndices =
-    autodiff::getFunctionSemanticResultIndices(originalAFD,
-                                               resolvedDiffParamIndices);
-  originalAFD->addDerivativeFunctionConfiguration(
-      {resolvedDiffParamIndices, resultIndices,
-       derivative->getGenericSignature()});
-
-  return false;
+  findAutoDiffOriginalFunctionDecl2(
+       originalName);
+       return true;
 }
 
+#pragma optimize( "", off )
+static bool testFunc() {
+    DerivativeAttr2 attr2;
+  attr2.OriginalFunctionName.Name.opaqueValue = 0x1234BEEF4321;
+  attr2.OriginalFunctionName.AccessorKind = 0;
+  return typeCheckDerivativeAttr(&attr2);
+} // test.
+
+//
+/**/
+
+int main() {
+  return testFunc();
+}
+#pragma optimize( "", on )
+#endif
+
+#if 1
+
 void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
-  if (typeCheckDerivativeAttr(attr))
-    attr->setInvalid();
+  attr->setInvalid();
 }
 
 AbstractFunctionDecl *
 DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
                                             DerivativeAttr *attr) const {
   // Try to resolve the original function.
+  #if 0
   if (attr->isValid() && attr->OriginalFunction.isNull())
     if (typeCheckDerivativeAttr(attr))
       attr->setInvalid();
-
+#endif
   // If the typechecker has resolved the original function, return it.
   if (auto *FD = attr->OriginalFunction.dyn_cast<AbstractFunctionDecl *>())
     return FD;
@@ -7624,3 +7905,4 @@ ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
 
   return ctx.AllocateCopy(results);
 }
+#endif

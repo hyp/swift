@@ -526,6 +526,7 @@ namespace swift {
     DiagnosticEngine *Engine;
     bool IsActive;
     
+      public:
     /// Create a new in-flight diagnostic. 
     ///
     /// This constructor is only available to the DiagnosticEngine.
@@ -536,7 +537,7 @@ namespace swift {
     InFlightDiagnostic &operator=(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(InFlightDiagnostic &&) = delete;
 
-  public:
+
     /// Create an active but unattached in-flight diagnostic.
     /// 
     /// The resulting diagnostic can be used as a dummy, accepting the
@@ -825,7 +826,7 @@ namespace swift {
     /// display diagnostics.
     SourceManager &SourceMgr;
 
-  private:
+
     /// The diagnostic consumer(s) that will be responsible for actually
     /// emitting diagnostics.
     SmallVector<DiagnosticConsumer *, 2> Consumers;

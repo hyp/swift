@@ -16,6 +16,6 @@
 
 #include "swift/DriverTool/DriverTool.h"
 
-int main(int argc_, const char **argv_) {
+int main2(int argc_, const char **argv_) {
   return swift::mainEntry(argc_, argv_);
 }
