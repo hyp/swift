@@ -1522,6 +1522,20 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     return ImportedName();
   result.effectiveContext = effectiveCtx;
 
+#if 0
+ if (D->getOwningModule() &&
+    D->getOwningModule()->getTopLevelModuleName().starts_with("libcxx_std") &&
+    (isa<clang::CXXRecordDecl>(D))) {
+
+      return ImportedName();
+      /*if (D->getDeclName().isEmpty())
+        return ImportedName();
+      if (D->getNameAsString() != "string" &&
+      D->getNameAsString() != "vector")
+        return ImportedName();*/
+    }
+#endif
+
   // If this is a using declaration, import the name of the shadowed decl and
   // adjust the context.
   if (auto usingShadowDecl = dyn_cast<clang::UsingShadowDecl>(D)) {
@@ -1634,6 +1648,21 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       }
     }
   }
+  
+#if 0
+  if (auto nd = dyn_cast<clang::NamespaceDecl>(D)) {
+    if (nd->getDeclName().isIdentifier() &&
+    nd->getDeclName().getAsString() == "std" &&
+    nd->getOwningModule() &&
+    nd->getOwningModule()->getTopLevelModuleName().starts_with("libcxx_std")) {
+
+      llvm::errs() << "RENAME STD NS\n";
+    result.setDeclName(DeclName(swiftCtx.getIdentifier("libcxx_std")));
+              result.setEffectiveContext(D->getDeclContext());
+          return result;
+    }
+  }
+#endif
 
   // If we have a swift_name attribute, use that.
   if (auto nameAttr = findSwiftNameAttr(D, version)) {

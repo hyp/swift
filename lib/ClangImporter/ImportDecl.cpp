@@ -1196,6 +1196,21 @@ namespace {
       // that should all be done via requests.
       enumDecl->setMemberLoader(&Impl, 0);
 
+    /*if (decl->getDeclName().isIdentifier() &&
+    decl->getDeclName().getAsString() == "std" &&
+    decl->getOwningModule() &&
+    decl->getOwningModule()->getTopLevelModuleName().starts_with("libcxx_std")) {
+      // Only import one enum for all redecls of a namespace. Because members
+      // are loaded lazily, we can cache all the redecls to prevent the creation
+      // of multiple enums.
+      for (auto redecl : decl->redecls()) {
+        if (redecl->getOwningModule() &&
+             redecl->getOwningModule()->getTopLevelModuleName().starts_with("libcxx_std"))
+        Impl.ImportedDecls[{redecl, getVersion()}] = enumDecl;
+      }
+      return enumDecl;
+    }*/
+
       // Only import one enum for all redecls of a namespace. Because members
       // are loaded lazily, we can cache all the redecls to prevent the creation
       // of multiple enums.

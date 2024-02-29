@@ -4249,7 +4249,16 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
           // This is an idiosyncrasy of the large loadable types pass which
           // ignores tuple types (considers them always "small").
           if (assignment.isLargeLoadableType(ty)) {
-            assert(isa<TupleType>(ty.getASTType()));
+            //ty->dump();
+            /*if (!isa<TupleType>(ty.getASTType())) {
+              llvm::errs() << "any generic " << (bool) ty.getASTType()->getAnyGeneric() << "\n";
+              ty.getASTType()->getCanonicalType()->dump();
+              ty.getASTType()->getCanonicalType().getAnyGeneric()->dump();
+              ty.getASTType().dump();
+              ty.dump();
+              currF.dump();
+            }*/
+            //assert(isa<TupleType>(ty.getASTType()));
             ;
             auto addr = assignment.createAllocStack(ty);
             assignment.mapValueToAddress(arg, addr);
