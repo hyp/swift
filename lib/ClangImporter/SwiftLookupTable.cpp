@@ -1291,6 +1291,17 @@ void SwiftLookupTableWriter::writeExtensionContents(
 
   // Populate the lookup table.
   SwiftLookupTable table(nullptr);
+  bool pop = true;
+  if (sema.Context.getTranslationUnitDecl()->noload_decls_begin()->getOwningModule()) {
+    sema.Context.getTranslationUnitDecl()->noload_decls_begin()->getOwningModule()->dump();
+  }
+  if (
+  sema.Context.getTranslationUnitDecl()->getOwningModule() &&
+  sema.Context.getTranslationUnitDecl()->getOwningModule()->getTopLevelModuleName().starts_with("libcxx_std")) {
+  pop = false;
+   llvm::errs() << "SKIPPING THE MODULE POP!\n";
+  }
+  if (pop)
   populateTable(table, nameImporter);
 
   SmallVector<uint64_t, 64> ScratchRecord;

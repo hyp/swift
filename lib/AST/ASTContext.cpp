@@ -6588,6 +6588,14 @@ Type ASTContext::getNamedSwiftType(ModuleDecl *module, StringRef name) {
 
   // Check if the lookup we're about to perform a lookup within is
   // a Clang module.
+  if (module->failedToLoad()) {
+    llvm::errs() << "OOPS< FAILED TO LAOD" << module->getName().str() << "\n";
+  }
+  if (const_cast<ModuleDecl *>(module)->getFiles().empty()) {
+    llvm::errs() << "OOPS< EMPTY MODU" << module->getName().str() << "\n";
+    llvm::errs() << "NAMU:" << name << "\n";
+  }
+
   for (auto *file : module->getFiles()) {
     if (auto clangUnit = dyn_cast<ClangModuleUnit>(file)) {
       // If we have an overlay, look in the overlay. Otherwise, skip

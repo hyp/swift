@@ -2019,6 +2019,9 @@ static llvm::VersionTuple getCurrentVersionFromTBD(StringRef path,
 bool ClangImporter::canImportModule(ImportPath::Module modulePath,
                                     ModuleVersionInfo *versionInfo,
                                     bool isTestableDependencyLookup) {
+                                      SmallString<256> str;
+                                      modulePath.getTopLevelPath().getString(str);
+  llvm::errs() << "CAN HAS CLANG MODULE: " << str << "\n";
   // Look up the top-level module to see if it exists.
   auto topModule = modulePath.front();
   clang::Module *clangModule = Impl.lookupModule(topModule.Item.str());
@@ -2073,6 +2076,7 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
 
 clang::Module *
 ClangImporter::Implementation::lookupModule(StringRef moduleName) {
+  llvm::errs() << "LOOKUP CLANG MODULE: " << moduleName << "\n";
   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
   if (getClangASTContext().getLangOpts().ImplicitModules)
     return clangHeaderSearch.lookupModule(
@@ -2106,6 +2110,9 @@ ClangImporter::Implementation::lookupModule(StringRef moduleName) {
 
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     SourceLoc importLoc, ImportPath::Module path) {
+                                            SmallString<256> str;
+                                      path.getTopLevelPath().getString(str);
+  llvm::errs() << "OO CLANG MOD LOAD: " << str << "\n";
   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
   auto realModuleName = SwiftContext.getRealModuleName(path.front().Item).str();
 
@@ -2225,12 +2232,131 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
   ModuleDecl *MD = nullptr;
   ASTContext &ctx = getNameImporter().getContext();
 
+SmallString<256> str;
+ path.getString(str);
+  llvm::errs() << "IMPL OF CLANG: " << str << "\n";
+
+  //import CxxStdlib
+  //import CxxStdlib_libcxx
+
+  if (path.front().Item.is("CTestMod")) {
+    // Note: preload 'ucrt'.
+    // This is needed to avoid module circular dependency conflict between
+    // libc++ and ucrt.
+    ImportPath::Builder adjustedPath(ctx.getIdentifier("ucrt"), importLoc);
+    adjustedPath.append(path.getSubmodulePath());
+    auto path2 = adjustedPath.copyTo(ctx).getModulePath(ImportKind::Module);
+    loadModule(importLoc,path2);
+
+
+    static bool isFirst = true;
+    if (isFirst) {
+      isFirst = false;
+      llvm::errs() << "update the module builder!\n";
+
+   auto addPath = [&](StringRef path) {
+auto &headerSearchInfo = getClangPreprocessor().getHeaderSearchInfo();
+  auto kind = true ? clang::SrcMgr::C_System : clang::SrcMgr::C_User;
+  bool isSystem = true;
+  bool isFramework = false;
+    clang::FileManager &fileMgr = Instance->getFileManager();
+  auto optionalEntry = fileMgr.getOptionalDirectoryRef(path);
+  if (!optionalEntry)
+    return;
+  auto entry = *optionalEntry;
+  headerSearchInfo.AddSearchPath({entry, kind, isFramework},
+                                 /*isAngled=*/true);
+
+  // In addition to changing the current preprocessor directly, we still need
+  // to change the options structure for future module-building.
+  Instance->getHeaderSearchOpts().AddPath(path,
+                   isSystem ? clang::frontend::System : clang::frontend::Angled,
+                                               isFramework,
+                                               /*IgnoreSysRoot=*/true);
+   };
+   //getClangPreprocessor().getHeaderSearchInfo().
+   getClangPreprocessor().getHeaderSearchInfo().SetSearchPaths({}, 0, 0, false, llvm::DenseMap<unsigned, unsigned>());
+    Instance->getHeaderSearchOpts().UserEntries.clear();
+    
+    
+    
+    addPath("S:\\up-b-libcxx\\include\\c++\\v1");
+    addPath("S:\\\\PROGRA~1\\\\Swift\\\\TOOLCH~1\\\\000611~1.0_A\\\\usr\\\\lib\\\\swift\\clang\\include");
+    addPath("C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.38.33130\\include");
+    addPath("C:\\Program Files (x86)\\Windows Kits\\10\\include\\10.0.22000.0\\ucrt");
+    addPath("C:\\Program Files (x86)\\Windows Kits\\10\\include\\10.0.22000.0\\um");
+
+
+
+  for (auto &E: Instance->getHeaderSearchOpts().UserEntries) {
+    llvm::errs() << int(E.Group) << ": " << E.Path << "\n";
+  }
+
+        llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> overridenVFS =
+          new llvm::vfs::InMemoryFileSystem();
+      //for (const auto &file : fileMapping.overridenFiles) {
+        // null terminate the buffer.
+        SmallString<2> contents;
+        contents.push_back(0);
+        StringRef path = "C:\\Program Files (x86)\\Windows Kits\\10\\include\\10.0.22000.0\\ucrt\\module.modulemap";
+        overridenVFS->addFile(path, 0,
+                              llvm::MemoryBuffer::getMemBuffer(StringRef(
+                                  contents.begin(), contents.size() - 1)));
+      //}
+      #if 0
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> overlayVFS =
+          new llvm::vfs::OverlayFileSystem(&Instance->getVirtualFileSystem());
+          overlayVFS->pushOverlay(overridenVFS);
+
+         Instance->createFileManager(overlayVFS);
+         #endif 
+      //Instance->getF
+      //Instance->setFileManager(FileManager *Value);
+
+
+
+#if 0
+  // In addition to changing the current preprocessor directly, we still need
+  // to change the options structure for future module-building.
+  int remove = 0;
+  for (auto &E: Instance->getHeaderSearchOpts().UserEntries) {
+    llvm::errs() << int(E.Group) << ": " << E.Path << "\n";
+    if (llvm::vfs::getRealFileSystem()->exists(E.Path + "/vector")) {
+      E.Path = "S:\\up-b-libcxx\\include\\c++\\v1";
+      llvm::errs() << "^^^ has cxx\n";
+    }
+    else if (llvm::vfs::getRealFileSystem()->exists(E.Path + "/stddef.h")) {
+      ++remove;
+      if (remove == 2 || remove == 3) {
+      E.Path = "S:\\temp\\does-not-exit";
+      llvm::errs() << "^^^ has c std removed\n";
+      }
+    }
+  }
+  llvm::errs() << "REFRESH:\n";
+    for (auto &E: Instance->getHeaderSearchOpts().UserEntries) {
+    llvm::errs() << int(E.Group) << ": " << E.Path << "\n";
+    }
+  
+  //assert(false);
+   /*Instance->getHeaderSearchOpts().AddPath("S:\\temp\\inc2",
+                   clang::frontend::Angled,
+                                               false,
+                                               true);*/
+#endif
+    }
+
+  }
+
   // `CxxStdlib` is the only accepted spelling of the C++ stdlib module name.
   if (path.front().Item.is("std") ||
       path.front().Item.str().starts_with("std_"))
     return nullptr;
+ // if (path.front().Item.str().starts_with("libcxx_std_"))
+  //  return nullptr;
   if (path.front().Item == ctx.Id_CxxStdlib) {
-    ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
+    //return nullptr;
+    ImportPath::Builder adjustedPath(ctx.getIdentifier("libcxx_std_string"), importLoc);
     adjustedPath.append(path.getSubmodulePath());
     path = adjustedPath.copyTo(ctx).getModulePath(ImportKind::Module);
   }
@@ -2239,12 +2365,39 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
     MD = loadModuleClang(importLoc, path);
   if (!MD)
     MD = loadModuleDWARF(importLoc, path);
+    if (path.front().Item.is("CTestMod"))  {
+ //assert(false && "done!");
+ llvm::errs() << "dump tables2\n";
+ #if 0
+ std::vector<StringRef> tablesToErase;
+  for (const auto &t: LookupTables) {
+    if (t.getFirst().starts_with("libcxx_std")) {
+      tablesToErase.push_back(t.getFirst());
+    }
+  }
+  for (const auto &tableName: tablesToErase) {
+    LookupTables.erase(tableName);
+  }
+ dumpSwiftLookupTables();
+ #endif
+    }
+        if (path.front().Item.is("CxxStdlib"))  {
+ //assert(false && "done!");
+ llvm::errs() << "dump tables1\n";
+ //dumpSwiftLookupTables();
+
+    }
+  ;//  assert(false && "done!");
   return MD;
 }
 
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     const clang::Module *clangModule, SourceLoc importLoc) {
   assert(clangModule);
+
+      if (clangModule->getFullModuleName() == "CTestMod")  {
+        llvm::errs() << "DONE DONE DONE WITH CTESTMOD\n";
+    }
 
   // Bump the generation count.
   bumpGeneration();
@@ -3683,11 +3836,13 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
     }
   }
 
+  //cast<clang::Decl>(effectiveClangContext.getAsDeclContext())->dump();
   // Dig through each of the Swift lookup tables, creating extensions
   // where needed.
   (void)Impl.forEachLookupTable([&](SwiftLookupTable &table) -> bool {
       // FIXME: If we already looked at this for this generation,
       // skip.
+      //table.dump();
 
       for (auto entry : table.allGlobalsAsMembersInContext(effectiveClangContext)) {
         // If the entry is not visible, skip it.
