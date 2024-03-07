@@ -286,6 +286,14 @@ foreach(sdk ${SWIFT_SDKS})
                                DESTINATION "lib/swift/${arch_subdir}"
                                COMPONENT sdk-overlay)
 
+    # FIXME: Can we drop Glibc for android?
+    if ("${sdk}" STREQUAL "ANDROID")
+      swift_install_in_component(FILES
+        "android.modulemap"
+        DESTINATION "lib/swift/${arch_subdir}"
+        COMPONENT sdk-overlay)
+    endif()
+
     if(SWIFT_BUILD_STATIC_STDLIB)
       swift_install_in_component(FILES "${glibc_modulemap_out}"
                                  DESTINATION "lib/swift_static/${arch_subdir}"
