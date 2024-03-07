@@ -206,8 +206,18 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
   // Ideally we would check that all of the headers referenced from the
   // modulemap are present.
   Path libcDir;
-  if (auto dir = findFirstIncludeDir(
-          parsedIncludeArgs, {"inttypes.h", "unistd.h", "stdint.h"}, vfs)) {
+  if (triple.isAndroid() &&
+      !clangDriverArgs.getLastArgValue(clang::driver::options::OPT__sysroot_EQ)
+           .empty()) {
+    // Swift's driver passes in the Android NDK path using the --sysroot Clang
+    // flag.
+    libcDir =
+        clangDriverArgs.getLastArgValue(clang::driver::options::OPT__sysroot_EQ)
+            .str();
+    llvm::sys::path::append(libcDir, "usr", "include");
+  } else if (auto dir = findFirstIncludeDir(
+                 parsedIncludeArgs, {"inttypes.h", "unistd.h", "stdint.h"},
+                 vfs)) {
     libcDir = dir.value();
   } else {
     ctx.Diags.diagnose(SourceLoc(), diag::libc_not_found, triple.str());
@@ -540,6 +550,12 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
                                          StringRef("SwiftGlibc.h"), vfs);
   }
   result.redirectedFiles.append(libcFileMapping);
+  if (triple.isAndroid()) {
+    // Android uses the android-specific module map that overlays the NDK.
+    // FIXME: Drop Glibc mapping for android as well.
+    result.redirectedFiles.append(
+        getLibcFileMapping(ctx, "android.modulemap", std::nullopt, vfs));
+  }
   // Both libc module maps have the C standard library headers all together in a
   // SwiftLibc module. That leads to module cycles with the clang _Builtin_
   // modules. e.g. <inttypes.h> includes <stdint.h> on these platforms. The
