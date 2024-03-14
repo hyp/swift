@@ -943,6 +943,11 @@ def cxx_interop_disable_requirement_at_import :
   HelpText<"Do not require C++ interoperability to be enabled when importing a Swift module that enables C++ interoperability">,
   Flags<[FrontendOption, HelpHidden]>;
 
+def cxx_interop_libcxx_path: JoinedOrSeparate<["-"], "clang-libcxx-path">,
+  HelpText<"Use a custom libc++ as the C++ standard library when importing Clang modules">,
+  MetaVarName<"<path>">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;

@@ -2238,8 +2238,8 @@ SmallString<256> str;
 
   //import CxxStdlib
   //import CxxStdlib_libcxx
-
-  if (path.front().Item.is("CTestMod")) {
+  bool useLibCxx = !ctx.LangOpts.cxxInteropCustomLibcxxPath.empty();
+  if (path.front().Item.is("CTestMod") && useLibCxx) {
     // Note: preload 'ucrt'.
     // This is needed to avoid module circular dependency conflict between
     // libc++ and ucrt.
@@ -2356,7 +2356,7 @@ auto &headerSearchInfo = getClangPreprocessor().getHeaderSearchInfo();
   //  return nullptr;
   if (path.front().Item == ctx.Id_CxxStdlib) {
     //return nullptr;
-    ImportPath::Builder adjustedPath(ctx.getIdentifier("libcxx_std_string"), importLoc);
+    ImportPath::Builder adjustedPath(ctx.getIdentifier(useLibCxx ? "libcxx_std_string" : "std"), importLoc);
     adjustedPath.append(path.getSubmodulePath());
     path = adjustedPath.copyTo(ctx).getModulePath(ImportKind::Module);
   }
