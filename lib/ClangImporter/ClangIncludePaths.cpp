@@ -554,7 +554,8 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     // Android uses the android-specific module map that overlays the NDK.
     // FIXME: Drop Glibc mapping for android as well.
     result.redirectedFiles.append(
-        getLibcFileMapping(ctx, "android.modulemap", std::nullopt, vfs));
+        getLibcFileMapping(ctx, "android.modulemap",
+                           StringRef("SwiftAndroidNDK.h"), vfs));
   }
   // Both libc module maps have the C standard library headers all together in a
   // SwiftLibc module. That leads to module cycles with the clang _Builtin_

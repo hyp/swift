@@ -292,6 +292,10 @@ foreach(sdk ${SWIFT_SDKS})
         "android.modulemap"
         DESTINATION "lib/swift/${arch_subdir}"
         COMPONENT sdk-overlay)
+      swift_install_in_component(FILES
+        "SwiftAndroidNDK.h"
+        DESTINATION "lib/swift/${arch_subdir}"
+        COMPONENT sdk-overlay)
     endif()
 
     if(SWIFT_BUILD_STATIC_STDLIB)
