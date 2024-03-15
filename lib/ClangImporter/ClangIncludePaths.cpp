@@ -208,18 +208,8 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
   // Ideally we would check that all of the headers referenced from the
   // modulemap are present.
   Path libcDir;
-  if (triple.isAndroid() &&
-      !clangDriverArgs.getLastArgValue(clang::driver::options::OPT__sysroot_EQ)
-           .empty()) {
-    // Swift's driver passes in the Android NDK path using the --sysroot Clang
-    // flag.
-    libcDir =
-        clangDriverArgs.getLastArgValue(clang::driver::options::OPT__sysroot_EQ)
-            .str();
-    llvm::sys::path::append(libcDir, "usr", "include");
-  } else if (auto dir = findFirstIncludeDir(
-                 parsedIncludeArgs, {"inttypes.h", "unistd.h", "stdint.h"},
-                 vfs)) {
+  if (auto dir = findFirstIncludeDir(
+          parsedIncludeArgs, {"inttypes.h", "unistd.h", "stdint.h"}, vfs)) {
     libcDir = dir.value();
   } else {
     ctx.Diags.diagnose(SourceLoc(), diag::libc_not_found, triple.str());
