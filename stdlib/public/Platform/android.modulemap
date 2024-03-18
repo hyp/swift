@@ -1,4 +1,8 @@
 // The module map for the Android NDK.
+// The majority of the modules in this file are prefixed
+// with an underscore, to discourage users from importing them from
+// Swift directly. Instead, users should import 'Android' or another
+// umbrella module that includes these headers.
 
 // The top level 'Android' module can be included from Swift.
 module Android [system] {
@@ -8,585 +12,385 @@ module Android [system] {
 
 // The modules for the Bionic C standard library used by
 // the Android NDK.
-module bionic_assert [system] {
+module _bionic_assert [system] {
   // <assert.h>'s use of NDEBUG requires textual inclusion.
   textual header "assert.h"
-  export *
 }
-module bionic_complex [system] {
+module _bionic_complex [system] {
   header "complex.h"
   export *
 }
-module bionic_ctype [system] {
+module _bionic_ctype [system] {
   header "ctype.h"
   export *
 }
-module bionic_errno [system] {
+module _bionic_errno [system] {
   header "errno.h"
   export *
 }
-module bionic_fenv [system] {
+module _bionic_fenv [system] {
   header "fenv.h"
   export *
 }
-// Use 'no_undeclared_includes' to avoid pulling in the libc++ headers. 
-module bionic_inttypes [system] [no_undeclared_includes] {
+// Use 'no_undeclared_includes' to avoid pulling in the libc++ headers.
+// FIXME: this can be dropped once NDK's libc++ 'std' module is split
+// into individual submodules.
+module _bionic_inttypes [system] [no_undeclared_includes] {
   header "inttypes.h"
   export *
-  use bionic_stdint
-  use android_sys_cdefs
+  use _bionic_stdint
+  use _android_sys_cdefs
 }
-module bionic_limits [system] {
+module _bionic_limits [system] {
   header "limits.h"
   header "bits/posix_limits.h"
   export *
 }
-module bionic_locale [system] {
+module _bionic_locale [system] {
   header "locale.h"
   export *
 }
-module bionic_malloc [system] {
+module _bionic_malloc [system] {
   header "malloc.h"
   export *
 }
-module bionic_math [system] {
+module _bionic_math [system] {
   header "math.h"
   export *
   link "m"
 }
-module bionic_pty [system] {
+module _bionic_pty [system] {
   header "pty.h"
   export *
 }
-module bionic_setjmp [system] {
+module _bionic_setjmp [system] {
   header "setjmp.h"
   export *
 }
-module bionic_signal [system] {
+module _bionic_signal [system] {
   header "signal.h"
   // The 'signal.h' header unfortunately has a circular include
   // with 'sys/ucontext.h' and thus it must be part of this module.
   header "sys/ucontext.h"
   export *
 }
-module bionic_stdatomic [system] {
+module _bionic_stdatomic [system] {
   header "stdatomic.h"
   export *
 }
-module bionic_stdint [system] {
+module _bionic_stdint [system] {
   header "stdint.h"
   export *
 }
-module bionic_stdio [system] {
+module _bionic_stdio [system] {
   header "stdio.h"
   export *
 }
-module bionic_stdio_ext [system] {
+module _bionic_stdio_ext [system] {
   header "stdio_ext.h"
   export *
 }
-module bionic_stdlib [system] {
+module _bionic_stdlib [system] {
   header "stdlib.h"
   export *
 }
-module bionic_string [system] {
+module _bionic_string [system] {
   header "string.h"
   export *
 }
-module bionic_time [system] {
+module _bionic_time [system] {
   header "time.h"
   export *
 }
-module bionic_utmp [system] {
+module _bionic_utmp [system] {
   header "utmp.h"
   export *
 }
 
 // POSIX and another android NDK headers.
-module android_alloca [system] {
+module _android_alloca [system] {
   header "alloca.h"
   export *
 }
 
-module android_ar [system] {
+module _android_core [system] {
   header "ar.h"
-  export *
-}
-
-module android_cpio [system] {
   header "cpio.h"
-  export *
-}
-
-module android_dirent [system] {
   header "dirent.h"
-  export *
-}
-
-module android_dlfcn [system] {
   header "dlfcn.h"
-  export *
-}
-
-module android_err [system] {
   header "err.h"
-  export *
-}
-
-module android_errno [system] {
   header "errno.h"
+  header "fcntl.h"
+  header "fnmatch.h"
+  header "fts.h"
+  header "glob.h"
+  header "mntent.h"
+  header "libgen.h"
+  header "nl_types.h"
+  header "paths.h"
+  header "poll.h"
+  header "pwd.h"
+  header "spawn.h"
+  header "tar.h"
+  header "unistd.h"
+  header "utime.h"
   export *
 }
 
-module android_execinfo [system] {
+module _android_execinfo [system] {
   header "execinfo.h"
   export *
 }
 
-module android_fcntl [system] {
-  header "fcntl.h"
-  export *
-}
-
-module android_features [system] {
+module _android_features [system] {
   // The features header pulls in cdefs which is
   // a textual header with C macros.
   textual header "features.h"
-  export *
 }
 
-module android_fenv [system] {
+module _android_fenv [system] {
   header "fenv.h"
   export *
 }
 
-module android_fnmatch [system] {
-  header "fnmatch.h"
-  export *
-}
-
-module android_fts [system] {
-  header "fts.h"
-  export *
-}
-
-module android_ftw [system] {
+module _android_ftw [system] {
   header "ftw.h"
   export *
 }
 
-module android_getopt [system] {
+module _android_getopt [system] {
   header "getopt.h"
   export *
 }
 
-module android_glob [system] {
-  header "glob.h"
-  export *
-}
-
-module android_grp [system] {
+module _android_grp [system] {
   header "grp.h"
   export *
 }
 
-module android_iconv [system] {
+module _android_iconv [system] {
   header "iconv.h"
   export *
 }
 
-module android_ifaddrs [system] {
+module _android_ifaddrs [system] {
   header "ifaddrs.h"
   export *
 }
 
-module android_jni [system] {
+module _android_jni [system] {
   header "jni.h"
   export *
 }
 
-module android_langinfo [system] {
+module _android_langinfo [system] {
   header "langinfo.h"
   export *
 }
 
-module android_libgen [system] {
-  header "libgen.h"
-  export *
-}
-
-module android_link [system] {
+module _android_link [system] {
   header "link.h"
   export *
 }
 
-module android_mntent [system] {
-  header "mntent.h"
-  export *
-}
-
-module android_netdb [system] {
+module _android_netdb [system] {
   header "netdb.h"
   export *
 }
 
-module android_nl_types [system] {
-  header "nl_types.h"
-  export *
-}
-
-module android_paths [system] {
-  header "paths.h"
-  export *
-}
-
-module android_poll [system] {
-  header "poll.h"
-  export *
-}
-
-module android_pthread [system] {
+module _android_pthread [system] {
   header "pthread.h"
   export *
   link "pthread"
 }
 
-module android_pwd [system] {
-  header "pwd.h"
-  export *
-}
-
-module android_regex [system] {
+module _android_regex [system] {
   header "regex.h"
   export *
 }
 
-module android_resolv [system] {
+module _android_resolv [system] {
   header "resolv.h"
   export *
 }
 
-module android_sched [system] {
+module _android_sched [system] {
   header "sched.h"
   export *
 }
 
-module android_search [system] {
+module _android_search [system] {
   header "search.h"
   export *
 }
 
-module android_semaphore [system] {
+module _android_semaphore [system] {
   header "semaphore.h"
   export *
 }
 
-module android_spawn [system] {
-  header "spawn.h"
-  export *
-}
-
-module android_strings [system] {
+module _android_strings [system] {
   header "strings.h"
   export *
 }
 
-module android_syscall [system] {
+module _android_sys [system] {
   header "syscall.h"
-  export *
-}
-
-module android_sysexits [system] {
   header "sysexits.h"
-  export *
-}
-
-module android_syslog [system] {
   header "syslog.h"
   export *
 }
 
-module android_tar [system] {
-  header "tar.h"
-  export *
-}
-
-module android_termio [system] {
+module _android_termio [system] {
   header "termio.h"
-  export *
-}
-
-module android_termios [system] {
   header "termios.h"
   export *
 }
 
-module android_threads [system] {
+module _android_threads [system] {
   header "threads.h"
   header "bits/threads_inlines.h"
   export *
 }
 
-module android_uchar [system] {
+module _android_uchar [system] {
   header "uchar.h"
   export *
 }
 
-module android_uconfig_local [system] {
+module _android_uconfig_local [system] {
   header "uconfig_local.h"
   export *
 }
 
-module android_ucontext [system] {
+module _android_ucontext [system] {
   header "ucontext.h"
   export *
 }
 
-module android_unistd [system] {
-  header "unistd.h"
-  export *
-}
-
-module android_utime [system] {
-  header "utime.h"
-  export *
-}
-
-module android_utmp [system] {
+module _android_utmp [system] {
   header "utmp.h"
-  export *
-}
-
-module android_utmpx [system] {
   header "utmpx.h"
   export *
 }
 
-module android_wait [system] {
+module _android_wait [system] {
   header "wait.h"
   export *
 }
 
-module android_wchar [system] {
+module _android_wchar [system] {
   header "wchar.h"
   export *
 }
 
-module android_xlocale [system] {
+module _android_xlocale [system] {
   header "xlocale.h"
   export *
 }
 
 // Additional modules in the 'android' subdirectory.
-module android_api_level [system] {
+module _android_apis_defs [system] {
   header "android/api-level.h"
-  export *
-}
-module android_asset_manager_jni [system] {
-  header "android/asset_manager_jni.h"
-  export *
-}
-module android_asset_manager [system] {
-  header "android/asset_manager.h"
-  export *
-}
-module android_ndk_version [system] {
   header "android/ndk-version.h"
-  export *
-}
-module android_log [system] {
-  header "android/log.h"
-  export *
-}
-module android_trace [system] {
-  header "android/trace.h"
-  export *
-}
-module android_versioning [system] {
   header "android/versioning.h"
   export *
 }
 
+module _android_apis [system] {
+  header "android/asset_manager_jni.h"
+  header "android/asset_manager.h"
+  header "android/log.h"
+  header "android/trace.h"
+  export *
+}
+
 // Additional modules in the 'bits' subdirectory.
-module android_bits_inaddr [system] {
+module _android_bits_io_inet [system] {
   header "bits/in_addr.h"
-  export *
-}
-module android_bits_ioctl [system] {
   header "bits/ioctl.h"
-  export *
-}
-module android_bits_mreq_source [system] {
   header "bits/ip_mreq_source.h"
-  export *
-}
-module android_bits_msfilter [system] {
   header "bits/ip_msfilter.h"
-  export *
-}
-module android_bits_mbstatet [system] {
-  header "bits/mbstate_t.h"
-  export *
-}
-module android_bits_sa_familyt [system] {
   header "bits/sa_family_t.h"
   export *
 }
-module android_bits_signaltypes [system] {
+module _android_bits_mbstatet [system] {
+  header "bits/mbstate_t.h"
+  export *
+}
+module _android_bits_signaltypes [system] {
   header "bits/signal_types.h"
   export *
 }
-module android_bits_stdatomic [system] {
+module _android_bits_stdatomic [system] {
   header "bits/stdatomic.h"
   export *
 }
-module android_bits_timespec [system] {
+module _android_bits_timespec [system] {
   header "bits/timespec.h"
   export *
 }
 
 // Additional modules in the 'sys' subdirectory.
-module android_sys_cdefs [system] {
+module _android_sys_cdefs [system] {
   // This is a textual header with C macros.
   textual header "sys/cdefs.h"
-  export *
 }
-module android_sys_endian [system] {
+module _android_sys_core [system] {
   header "sys/endian.h"
-  export *
-}
-module android_sys_epoll [system] {
   header "sys/epoll.h"
-  export *
-}
-module android_sys_errno [system] {
   header "sys/errno.h"
-  export *
-}
-module android_sys_eventfd [system] {
   header "sys/eventfd.h"
-  export *
-}
-module android_sys_fcntl [system] {
   header "sys/fcntl.h"
-  export *
-}
-module android_sys_file [system] {
   header "sys/file.h"
-  export *
-}
-module android_sys_ifunc [system] {
   header "sys/ifunc.h"
-  export *
-}
-module android_sys_inotify [system] {
   header "sys/inotify.h"
-  export *
-}
-module android_sys_ioctl [system] {
   header "sys/ioctl.h"
-  export *
-}
-module android_sys_ipc [system] {
   header "sys/ipc.h"
-  export *
-}
-module android_sys_mman [system] {
   header "sys/mman.h"
-  export *
-}
-module android_sys_mount [system] {
   header "sys/mount.h"
-  export *
-}
-module android_sys_msg [system] {
   header "sys/msg.h"
-  export *
-}
-module android_sys_random [system] {
   header "sys/random.h"
-  export *
-}
-module android_sys_resource [system] {
   header "sys/resource.h"
+  header "sys/sem.h"
+  header "sys/sendfile.h"
+  header "sys/shm.h"
+  header "sys/socket.h"
+  header "sys/stat.h"
+  header "sys/statvfs.h"
+  header "sys/uio.h"
+  header "sys/un.h"
+  header "sys/unistd.h"
+  header "sys/utsname.h"
+  header "sys/vfs.h"
+  header "sys/wait.h"
   export *
 }
-module android_sys_select [system] {
+module _andorid_sys_select [system] {
   header "sys/select.h"
   export *
 }
-module android_sys_sem [system] {
-  header "sys/sem.h"
-  export *
-}
-module android_sys_sendfile [system] {
-  header "sys/sendfile.h"
-  export *
-}
-module android_sys_shn [system] {
-  header "sys/shm.h"
-  export *
-}
-module android_sys_socket [system] {
-  header "sys/socket.h"
-  export *
-}
-module android_sys_stat [system] {
-  header "sys/stat.h"
-  export *
-}
-module android_sys_statvfs [system] {
-  header "sys/statvfs.h"
-  export *
-}
-module android_sys_time [system] {
+module _android_sys_time [system] {
   header "sys/time.h"
-  export *
-}
-module android_sys_times [system] {
   header "sys/times.h"
   export *
 }
 // Use 'no_undeclared_includes' to avoid pulling in the libc++ headers. 
-module android_sys_types [system] [no_undeclared_includes] {
+module _android_sys_types [system] [no_undeclared_includes] {
   header "sys/types.h"
   // The 'sys/types.h' header has a circular include
   // with 'bits/pthread_types.h' and thus it must be in the same module.
   header "bits/pthread_types.h"
   export *
-  use bionic_stdint
-  use android_sys_cdefs
-}
-module android_sys_uio [system] {
-  header "sys/uio.h"
-  export *
-}
-module android_sys_un [system] {
-  header "sys/un.h"
-  export *
-}
-module android_sys_unistd [system] {
-  header "sys/unistd.h"
-  export *
+  use _bionic_stdint
+  use _android_sys_cdefs
 }
 // Use 'no_undeclared_includes' to avoid pulling in the libc++ headers. 
-module android_sys_user [system] [no_undeclared_includes]  {
+module _android_sys_user [system] [no_undeclared_includes]  {
   header "sys/user.h"
   export *
-  use bionic_stdint
-  use android_sys_cdefs
-}
-module android_sys_utsname [system] {
-  header "sys/utsname.h"
-  export *
-}
-module android_sys_vfs [system] {
-  header "sys/vfs.h"
-  export *
-}
-module android_sys_wait [system] {
-  header "sys/wait.h"
-  export *
+  use _bionic_stdint
+  use _android_sys_cdefs
 }
 
 // Module for zlib headers.
