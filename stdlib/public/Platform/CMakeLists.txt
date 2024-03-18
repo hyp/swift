@@ -296,6 +296,10 @@ foreach(sdk ${SWIFT_SDKS})
         "SwiftAndroidNDK.h"
         DESTINATION "lib/swift/${arch_subdir}"
         COMPONENT sdk-overlay)
+      swift_install_in_component(FILES
+        "SwiftBionic.h"
+        DESTINATION "lib/swift/${arch_subdir}"
+        COMPONENT sdk-overlay)
     endif()
 
     if(SWIFT_BUILD_STATIC_STDLIB)

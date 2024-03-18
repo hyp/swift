@@ -186,7 +186,8 @@ static bool shouldInjectLibcModulemap(const llvm::Triple &triple) {
 static SmallVector<std::pair<std::string, std::string>, 2>
 getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
                    std::optional<StringRef> maybeHeaderFileName,
-                   const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+                   const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
+                   std::optional<StringRef> maybeSecondHeaderFileName = {}) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
   if (!shouldInjectLibcModulemap(triple))
     return {};
@@ -227,19 +228,23 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
   SmallVector<std::pair<std::string, std::string>, 2> vfsMappings{
       {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)}};
 
-  if (maybeHeaderFileName) {
-    // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
-    // directly from the modulemap.
-    Path actualHeaderPath = actualModuleMapPath;
-    llvm::sys::path::remove_filename(actualHeaderPath);
-    llvm::sys::path::append(actualHeaderPath, maybeHeaderFileName.value());
+  auto addHeader = [&](const std::optional<StringRef> maybeHeaderFileName) {
+    if (maybeHeaderFileName) {
+      // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
+      // directly from the modulemap.
+      Path actualHeaderPath = actualModuleMapPath;
+      llvm::sys::path::remove_filename(actualHeaderPath);
+      llvm::sys::path::append(actualHeaderPath, maybeHeaderFileName.value());
 
-    Path injectedHeaderPath(libcDir);
-    llvm::sys::path::append(injectedHeaderPath, maybeHeaderFileName.value());
+      Path injectedHeaderPath(libcDir);
+      llvm::sys::path::append(injectedHeaderPath, maybeHeaderFileName.value());
 
-    vfsMappings.push_back(
-        {std::string(injectedHeaderPath), std::string(actualHeaderPath)});
-  }
+      vfsMappings.push_back(
+          {std::string(injectedHeaderPath), std::string(actualHeaderPath)});
+    }
+  };
+  addHeader(maybeHeaderFileName);
+  addHeader(maybeSecondHeaderFileName);
 
   return vfsMappings;
 }

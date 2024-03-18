@@ -10,8 +10,15 @@ module Android [system] {
   export *
 }
 
-// The modules for the Bionic C standard library used by
-// the Android NDK.
+// The top level 'Bionic' module is the C standard library
+// used in the Android NDK.
+module Bionic [system] {
+  header "SwiftBionic.h"
+  export *
+}
+
+// The individual modules for the Bionic C standard library used
+// by the Android NDK.
 module _bionic_assert [system] {
   // <assert.h>'s use of NDEBUG requires textual inclusion.
   textual header "assert.h"
