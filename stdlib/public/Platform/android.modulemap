@@ -391,6 +391,7 @@ module _android_sys_types [system] [no_undeclared_includes] {
   export *
   use _bionic_stdint
   use _android_sys_cdefs
+  use _Builtin_stddef
 }
 // Use 'no_undeclared_includes' to avoid pulling in the libc++ headers. 
 module _android_sys_user [system] [no_undeclared_includes]  {
@@ -398,6 +399,7 @@ module _android_sys_user [system] [no_undeclared_includes]  {
   export *
   use _bionic_stdint
   use _android_sys_cdefs
+  use _Builtin_stddef
 }
 
 // Module for zlib headers.
