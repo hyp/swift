@@ -76,6 +76,7 @@
 #include "wchar.h"
 #include "xlocale.h"
 
+#include "arpa/inet.h"
 #include "linux/if.h"
 
 #include "android/api-level.h"

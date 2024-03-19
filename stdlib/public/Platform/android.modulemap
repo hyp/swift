@@ -338,6 +338,12 @@ module _android_bits_timespec [system] {
   export *
 }
 
+// Additional modules in the 'arpa' subdirectory.
+module _android_arpa_core [system] {
+  header "arpa/inet.h"
+  export *
+}
+
 // Additional modules in the 'linux' subdirectory.
 module _android_linux_core [system] {
   header "linux/if.h"
