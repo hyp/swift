@@ -126,9 +126,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   endforeach()
 endif()
 
-set(swiftGlibc_target_sdks ANDROID CYGWIN FREEBSD OPENBSD LINUX HAIKU)
+set(swiftGlibc_target_sdks CYGWIN FREEBSD OPENBSD LINUX HAIKU)
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "linux")
-  set(swiftGlibc_target_sdks ANDROID CYGWIN FREEBSD OPENBSD LINUX HAIKU FREESTANDING)
+  set(swiftGlibc_target_sdks CYGWIN FREEBSD OPENBSD LINUX HAIKU FREESTANDING)
 endif()
 add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     ${swift_platform_sources}
@@ -229,6 +229,24 @@ foreach(sdk ${SWIFT_SDKS})
     set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
     set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
 
+    if ("${sdk}" STREQUAL "ANDROID")
+      swift_install_in_component(FILES
+        "android.modulemap"
+        DESTINATION "lib/swift/${arch_subdir}"
+        COMPONENT sdk-overlay)
+      swift_install_in_component(FILES
+        "SwiftAndroidNDK.h"
+        DESTINATION "lib/swift/${arch_subdir}"
+        COMPONENT sdk-overlay)
+      swift_install_in_component(FILES
+        "SwiftBionic.h"
+        DESTINATION "lib/swift/${arch_subdir}"
+        COMPONENT sdk-overlay)
+      
+      # Do not build Glibc for Android.
+      continue()
+    endif()
+
     set(glibc_modulemap_source "glibc.modulemap.gyb")
     set(glibc_modulemap_out "${module_dir}/glibc.modulemap")
     set(glibc_modulemap_out_static "${module_dir_static}/glibc.modulemap")
@@ -301,22 +319,6 @@ foreach(sdk ${SWIFT_SDKS})
     swift_install_in_component(FILES "${glibc_header_out}"
                                DESTINATION "lib/swift/${arch_subdir}"
                                COMPONENT sdk-overlay)
-
-    # FIXME: Can we drop Glibc for android?
-    if ("${sdk}" STREQUAL "ANDROID")
-      swift_install_in_component(FILES
-        "android.modulemap"
-        DESTINATION "lib/swift/${arch_subdir}"
-        COMPONENT sdk-overlay)
-      swift_install_in_component(FILES
-        "SwiftAndroidNDK.h"
-        DESTINATION "lib/swift/${arch_subdir}"
-        COMPONENT sdk-overlay)
-      swift_install_in_component(FILES
-        "SwiftBionic.h"
-        DESTINATION "lib/swift/${arch_subdir}"
-        COMPONENT sdk-overlay)
-    endif()
 
     if(SWIFT_BUILD_STATIC_STDLIB)
       swift_install_in_component(FILES "${glibc_modulemap_out}"
