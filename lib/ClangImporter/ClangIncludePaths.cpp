@@ -552,7 +552,7 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     // FIXME: Drop Glibc mapping for android as well.
     result.redirectedFiles.append(
         getLibcFileMapping(ctx, "android.modulemap",
-                           StringRef("SwiftAndroidNDK.h"), vfs));
+                           StringRef("SwiftAndroidNDK.h"), vfs, StringRef("SwiftBionic.h")));
   }
   // Both libc module maps have the C standard library headers all together in a
   // SwiftLibc module. That leads to module cycles with the clang _Builtin_
