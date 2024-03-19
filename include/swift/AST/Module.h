@@ -386,11 +386,6 @@ public:
   void setBypassResilience() { BypassResilience = true; }
 
   ArrayRef<FileUnit *> getFiles() {
-    if (Files.empty()) {
-      if (!failedToLoad()) {
-        llvm::errs() << "oops haha" << getName().str() << "\n";
-      }
-    }
     assert(!Files.empty() || failedToLoad());
     return Files;
   }
