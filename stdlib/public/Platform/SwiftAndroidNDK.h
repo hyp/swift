@@ -78,6 +78,8 @@
 
 #include "arpa/inet.h"
 #include "linux/if.h"
+#include "netinet/in.h"
+#include "netinet/in6.h"
 
 #include "android/api-level.h"
 #include "android/asset_manager_jni.h"
