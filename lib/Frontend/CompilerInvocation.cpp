@@ -1187,9 +1187,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.CxxInteropGettersSettersAsProperties = Args.hasArg(OPT_cxx_interop_getters_setters_as_properties);
   Opts.RequireCxxInteropToImportCxxInteropModule =
       !Args.hasArg(OPT_cxx_interop_disable_requirement_at_import);
-  if (const auto *A = Args.getLastArg(OPT_cxx_interop_libcxx_path)) {
-    Opts.cxxInteropCustomLibcxxPath = A->getValue();
-  }
 
   Opts.VerifyAllSubstitutionMaps |= Args.hasArg(OPT_verify_all_substitution_maps);
 
