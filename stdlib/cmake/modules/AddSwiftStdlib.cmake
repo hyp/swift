@@ -2021,9 +2021,12 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "OPENBSD")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OPENBSD})
-    elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
+    elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
+    elseif(sdk STREQUAL "ANDROID")
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_ANDROID})
     elseif(sdk STREQUAL "CYGWIN")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_CYGWIN})
