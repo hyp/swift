@@ -338,6 +338,12 @@ module _android_bits_timespec [system] {
   export *
 }
 
+// Additional modules in the 'linux' subdirectory.
+module _android_linux_core [system] {
+  header "linux/if.h"
+  export *
+}
+
 // Additional modules in the 'sys' subdirectory.
 module _android_sys_cdefs [system] {
   // This is a textual header with C macros.

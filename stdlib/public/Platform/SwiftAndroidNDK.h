@@ -76,6 +76,8 @@
 #include "wchar.h"
 #include "xlocale.h"
 
+#include "linux/if.h"
+
 #include "android/api-level.h"
 #include "android/asset_manager_jni.h"
 #include "android/asset_manager.h"
