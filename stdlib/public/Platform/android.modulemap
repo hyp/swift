@@ -208,7 +208,6 @@ module _android_netdb [system] {
 module _android_pthread [system] {
   header "pthread.h"
   export *
-  link "pthread"
 }
 
 module _android_regex [system] {
