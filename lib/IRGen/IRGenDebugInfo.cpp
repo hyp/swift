@@ -2568,7 +2568,6 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
 void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
                                                        StringRef failureMsg) {
   auto TrapLoc = Builder.getCurrentDebugLocation();
-
   // Create a function in the debug info which has failureMsg as name.
   // TrapSc is the SIL debug scope which corresponds to TrapSP in the LLVM debug
   // info.

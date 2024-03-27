@@ -55,6 +55,7 @@
 #include "swift/Strings.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Index/USRGeneration.h"
 #include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -687,6 +688,10 @@ IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
   case DeclBaseName::Kind::Normal: {
     if (ident.empty())
       return 0;
+    if (ident.getIdentifier().str().find("<") != StringRef::npos) {
+      llvm::errs() << "HAS < " << ident << "\n";
+      assert(false);
+    }
 
     IdentifierID &id = IdentifierIDs[ident.getIdentifier()];
     if (id != 0)
@@ -2121,8 +2126,25 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
     bool isProtocolExt = DC->getParent()->getExtendedProtocolDecl();
 
+    Identifier name = generic->getName();
+    if (generic->hasClangNode()) {
+      if (auto *ctsd = dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(generic->getClangDecl())) {
+        auto it = name.str().find("<");
+        if (it != StringRef::npos) {
+          // Serialize a C++ class template specialization name as original
+          // class template name, and use its USR as the discriminator, that
+          // will let Swift find the correct specialization when this cross
+          // reference is deserialized.
+          name = getASTContext().getIdentifier(name.str().substr(0, it));
+          assert(discriminator.empty());
+          llvm::SmallString<128> buffer;
+          clang::index::generateUSRForDecl(ctsd, buffer);
+          discriminator = getASTContext().getIdentifier(buffer.str());
+        }
+      }
+    }
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addDeclBaseNameRef(generic->getName()),
+                                        addDeclBaseNameRef(name),
                                         addDeclBaseNameRef(discriminator),
                                         isProtocolExt,
                                         generic->hasClangNode());
@@ -2234,7 +2256,11 @@ void Serializer::writeCrossReference(const Decl *D) {
 
   unsigned abbrCode;
 
+  llvm::errs() << "write xref decl\n";
+  D->dump();
+
   if (auto op = dyn_cast<OperatorDecl>(D)) {
+    llvm::errs() << "emit operator!\n";
     writeCrossReference(op->getDeclContext(), 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
@@ -2295,8 +2321,33 @@ void Serializer::writeCrossReference(const Decl *D) {
       discriminator = containingFile->getDiscriminatorForPrivateDecl(type);
     }
 
+    Identifier name = type->getName();
+    if (D->hasClangNode()) {
+      //if (generic->getName().str().startswith("vector")) {
+        //generic->getClangNode().dump();
+        if (auto *ctsd = dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(D->getClangDecl())) {
+          auto it = name.str().find("<");
+          if (it != StringRef::npos) {
+            name = getASTContext().getIdentifier(name.str().substr(0, it));
+            assert(discriminator.empty());
+            llvm::SmallString<128> buffer;
+            clang::index::generateUSRForDecl(ctsd, buffer);
+            discriminator = getASTContext().getIdentifier(buffer.str());
+          }
+          llvm::errs() << "CTSD!\n";
+          //ctsd->dump();
+          llvm::errs() << "NEW NAME: " << name << "\n";
+          llvm::errs() << "NEW DIS: " << discriminator << "\n";
+        }
+        //assert(false);
+        //return;
+        
+        // return;
+      //}
+    }
+
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        addDeclBaseNameRef(type->getName()),
+                                        addDeclBaseNameRef(name),
                                         addDeclBaseNameRef(discriminator),
                                         isProtocolExt, D->hasClangNode());
     return;
@@ -5075,6 +5126,8 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
   };
 
   if (isDeclXRef(D)) {
+    llvm::errs() << "get out!\n";
+    D->dump();
     writeCrossReference(D);
     return;
   }

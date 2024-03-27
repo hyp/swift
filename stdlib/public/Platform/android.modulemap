@@ -41,7 +41,7 @@ module _bionic_fenv [system] {
 }
 // Use 'no_undeclared_includes' to avoid pulling in the libc++ headers.
 // FIXME: this can be dropped once NDK's libc++ 'std' module is split
-// into individual submodules.
+// into individual submodules. 
 module _bionic_inttypes [system] [no_undeclared_includes] {
   header "inttypes.h"
   export *
