@@ -1,3 +1,15 @@
+//===--- SwiftAndroidNDK.h ------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 #ifndef SWIFT_ANDROID_NDK_MODULE
 #define SWIFT_ANDROID_NDK_MODULE
 
@@ -28,7 +40,7 @@
 #include "dirent.h"
 #include "dlfcn.h"
 #include "err.h"
-#include "errno.h"
+#include "error.h"
 #include "execinfo.h"
 #include "fcntl.h"
 #include "fenv.h"
