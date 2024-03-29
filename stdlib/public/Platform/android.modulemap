@@ -318,14 +318,13 @@ module _xlocale [system] {
 }
 
 // Additional modules in the 'android' subdirectory.
-module _apis_defs [system] {
-  header "android/api-level.h"
+module _android_defs [system] {
   header "android/ndk-version.h"
   header "android/versioning.h"
   export *
 }
 
-module _apis [system] {
+module _android_apis [system] {
   header "android/asset_manager_jni.h"
   header "android/asset_manager.h"
   header "android/log.h"
@@ -363,11 +362,11 @@ module _linux_inet [system] {
 
 // Additional modules in the 'sys' subdirectory.
 module _sys_cdefs [system] {
-  // This is a header with C macros, that is marked
-  // as textual, to avoid a circular dependency between
-  // it and the `android/api-level` header, which includes
-  // it, but is also included from it.
-  textual header "sys/cdefs.h"
+  header "sys/cdefs.h"
+  // Circular included header, so combine them
+  // into the same module.
+  header "android/api-level.h"
+  export *
 }
 module _sys_core [system] {
   header "sys/endian.h"
