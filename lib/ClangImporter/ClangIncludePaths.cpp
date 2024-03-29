@@ -187,9 +187,8 @@ static bool shouldInjectLibcModulemap(const llvm::Triple &triple) {
 
 static SmallVector<std::pair<std::string, std::string>, 2>
 getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
-                   std::optional<StringRef> maybeHeaderFileName,
-                   const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
-                   std::optional<StringRef> maybeSecondHeaderFileName = {}) {
+                   std::optional<ArrayRef<StringRef>> maybeHeaderFileNames,
+                   const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
   if (!shouldInjectLibcModulemap(triple))
     return {};
@@ -230,23 +229,21 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
   SmallVector<std::pair<std::string, std::string>, 2> vfsMappings{
       {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)}};
 
-  auto addHeader = [&](const std::optional<StringRef> maybeHeaderFileName) {
-    if (maybeHeaderFileName) {
+  if (maybeHeaderFileNames) {
+    for (const auto &filename: *maybeHeaderFileNames) {
       // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
       // directly from the modulemap.
       Path actualHeaderPath = actualModuleMapPath;
       llvm::sys::path::remove_filename(actualHeaderPath);
-      llvm::sys::path::append(actualHeaderPath, maybeHeaderFileName.value());
+      llvm::sys::path::append(actualHeaderPath, filename);
 
       Path injectedHeaderPath(libcDir);
-      llvm::sys::path::append(injectedHeaderPath, maybeHeaderFileName.value());
+      llvm::sys::path::append(injectedHeaderPath, filename);
 
       vfsMappings.push_back(
           {std::string(injectedHeaderPath), std::string(actualHeaderPath)});
     }
-  };
-  addHeader(maybeHeaderFileName);
-  addHeader(maybeSecondHeaderFileName);
+  }
 
   return vfsMappings;
 }
@@ -541,19 +538,17 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
     // WASI Mappings
     libcFileMapping =
         getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs);
+  } else if (triple.isAndroid()) {
+    // Android uses the android-specific module map that overlays the NDK.
+    StringRef headerFiles[] = { "SwiftAndroidNDK.h", "SwiftBionic.h" };
+    libcFileMapping = getLibcFileMapping(ctx, "android.modulemap",
+                           headerFiles, vfs);
   } else {
-    // Android/BSD/Linux Mappings
+    // BSD/Linux Mappings
     libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
                                          StringRef("SwiftGlibc.h"), vfs);
   }
   result.redirectedFiles.append(libcFileMapping);
-  if (triple.isAndroid()) {
-    // Android uses the android-specific module map that overlays the NDK.
-    // FIXME: Drop Glibc mapping for android as well.
-    result.redirectedFiles.append(
-        getLibcFileMapping(ctx, "android.modulemap",
-                           StringRef("SwiftAndroidNDK.h"), vfs, StringRef("SwiftBionic.h")));
-  }
   // Both libc module maps have the C standard library headers all together in a
   // SwiftLibc module. That leads to module cycles with the clang _Builtin_
   // modules. e.g. <inttypes.h> includes <stdint.h> on these platforms. The
