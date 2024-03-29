@@ -2097,8 +2097,6 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
           ctx.evaluator, CXXNamespaceMemberLookup({cast<EnumDecl>(decl), name}),
           {});
       populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
-      llvm::errs() << "lazy lookup table for ns!\n";
-      Table.dump();
 
       // Bypass the regular member lookup table if we find something in
       // the original C++ namespace. We don't want to store the C++ decl in the
@@ -2107,10 +2105,8 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
       // entries found in the lookup table, to support finding members in
       // namespace extensions.
       if (!allFound.empty()) {
-        llvm::errs() << "direct namespace lookup!\n";
         auto known = Table.find(name);
         if (known != Table.end()) {
-          llvm::errs() << "found in table too!\n";
           auto swiftLookupResult = maybeFilterOutUnwantedDecls(
               known->second, name, includeAttrImplements,
               excludeMacroExpansions);

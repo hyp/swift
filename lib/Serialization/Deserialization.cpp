@@ -43,7 +43,6 @@
 #include "clang/AST/Attr.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/AttributeCommonInfo.h"
-#include "clang/Index/USRGeneration.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -772,7 +771,6 @@ ProtocolConformanceDeserializer::read(
       MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
-     llvm::errs() << "asuberr1\n";
     // We don't know how to serialize types represented by sub-blocks.
     return MF.diagnoseFatal();
   }
@@ -784,27 +782,20 @@ ProtocolConformanceDeserializer::read(
 
   switch (kind) {
   case decls_block::SELF_PROTOCOL_CONFORMANCE:
-  llvm::errs() << "asub1\n";
     return readSelfProtocolConformance(scratch);
   case decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE:
-  llvm::errs() << "asub2\n";
     return readSpecializedProtocolConformance(scratch);
   case decls_block::INHERITED_PROTOCOL_CONFORMANCE:
-  llvm::errs() << "asub3\n";
     return readInheritedProtocolConformance(scratch);
   case decls_block::BUILTIN_PROTOCOL_CONFORMANCE:
-  llvm::errs() << "asu4\n";
     return readBuiltinProtocolConformance(scratch);
   case decls_block::NORMAL_PROTOCOL_CONFORMANCE:
-  llvm::errs() << "asub5\n";
     return readNormalProtocolConformance(scratch, conformanceEntry);
   case decls_block::PROTOCOL_CONFORMANCE_XREF:
-  llvm::errs() << "asub6\n";
     return readNormalProtocolConformanceXRef(scratch);
 
   // Not a protocol conformance.
   default:
-  llvm::errs() << "asuberr2\n";
     return MF.diagnoseFatal(llvm::make_error<InvalidRecordKindError>(kind));
   }
 }
@@ -928,10 +919,8 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
                                             moduleID);
 
   auto maybeNominal = MF.getDeclChecked(nominalID);
-  if (!maybeNominal) {
-    llvm::errs() << "readNormalProtocolConformanceXRef1\n";
+  if (!maybeNominal)
     return maybeNominal.takeError();
-  }
 
   auto nominal = cast<NominalTypeDecl>(maybeNominal.get());
   PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
@@ -1030,7 +1019,6 @@ ProtocolConformanceDeserializer::read(
       MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
-    llvm::errs() << "suberr1\n";
     // We don't know how to serialize types represented by sub-blocks.
     return MF.diagnoseFatal();
   }
@@ -1051,17 +1039,13 @@ ProtocolConformanceDeserializer::read(
                                     patternConformanceIDs);
 
   auto patternTypeOrError = MF.getTypeChecked(patternTypeID);
-  if (!patternTypeOrError){
-    llvm::errs() << "suberr2\n";
+  if (!patternTypeOrError)
     return patternTypeOrError.takeError();
-  }
   auto patternType = patternTypeOrError.get();
 
   auto protocolOrError = MF.getDeclChecked(protocolID);
-  if (!protocolOrError) {
-    llvm::errs() << "suberr3\n";
+  if (!protocolOrError)
     return protocolOrError.takeError();
-  }
   auto *protocol = protocolOrError.get();
 
   PrettyStackTraceType trace(MF.getAssociatedModule()->getASTContext(),
@@ -1071,10 +1055,8 @@ ProtocolConformanceDeserializer::read(
   SmallVector<ProtocolConformanceRef, 4> patternConformances;
   for (auto confID : patternConformanceIDs) {
     auto confOrError = MF.getConformanceChecked(confID);
-    if (!confOrError) {
-      llvm::errs() << "suberr4\n";
+    if (!confOrError)
       return confOrError.takeError();
-    }
     patternConformances.push_back(confOrError.get());
   }
 
@@ -1082,14 +1064,12 @@ ProtocolConformanceDeserializer::read(
          PackConformance::get(patternType->castTo<PackType>(),
                               cast<ProtocolDecl>(protocol),
                               patternConformances);
-                               llvm::errs() << "here!\n";
   return conformance;
 }
 
 ProtocolConformanceRef
 ModuleFile::getConformance(ProtocolConformanceID id) {
   auto conformance = getConformanceChecked(id);
-  llvm::errs() << "getConformance" << id << "\n";
   if (!conformance)
     fatal(conformance.takeError());
   return conformance.get();
@@ -1103,7 +1083,6 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
 
   switch (conformanceID & SerializedProtocolConformanceKind::Mask) {
   case SerializedProtocolConformanceKind::Abstract: {
-     llvm::errs() << "getConformanceAbstract" << conformanceID << "\n";
     auto protocolID = conformanceID >> SerializedProtocolConformanceKind::Shift;
     auto maybeProtocol = getDeclChecked(protocolID);
     if (!maybeProtocol)
@@ -1113,24 +1092,19 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
   }
 
   case SerializedProtocolConformanceKind::Concrete: {
-    llvm::errs() << "getConformancConcrete" << conformanceID << "\n";
     auto conformanceIndex = (conformanceID >> SerializedProtocolConformanceKind::Shift) - 1;
     assert(conformanceIndex < Conformances.size() && "invalid conformance ID");
     auto &conformanceOrOffset = Conformances[conformanceIndex];
     if (!conformanceOrOffset.isComplete()) {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       if (auto error = diagnoseFatalIfNotSuccess(
-              DeclTypeCursor.JumpToBit(conformanceOrOffset))) {
-                llvm::errs() << "err1\n";
+              DeclTypeCursor.JumpToBit(conformanceOrOffset)))
         return std::move(error);
-              }
 
       auto result =
         ProtocolConformanceDeserializer(*this).read(conformanceOrOffset);
-      if (!result) {
-        llvm::errs() << "err2\n";
+      if (!result)
         return result.takeError();
-      }
 
       conformanceOrOffset = result.get();
     }
@@ -1139,7 +1113,6 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
   }
 
   case SerializedProtocolConformanceKind::Pack: {
-    llvm::errs() << "getConformancPack" << conformanceID << "\n";
     auto conformanceIndex = (conformanceID >> SerializedProtocolConformanceKind::Shift) - 1;
     assert(conformanceIndex < PackConformances.size() && "invalid pack conformance ID");
     auto &conformanceOrOffset = PackConformances[conformanceIndex];
@@ -1954,7 +1927,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
   ModuleDecl *baseModule = getModule(MID);
   if (!baseModule) {
-    llvm::errs() << "resolveCrossReference - err1\n";
     return llvm::make_error<XRefNonLoadedModuleError>(getIdentifier(MID));
   }
 
@@ -1963,12 +1935,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
   llvm::BitstreamEntry entry =
       fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    llvm::errs() << "resolveCrossReference - err2\n";
+  if (entry.Kind != llvm::BitstreamEntry::Record)
     return diagnoseFatal();
-  }
-  llvm::errs() << "resolvexref name: " << baseModule->getName().str() << "\n";
-
 
   SmallVector<ValueDecl *, 8> values;
   SmallVector<uint64_t, 8> scratch;
@@ -1984,7 +1952,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   switch (recordID) {
   case XREF_TYPE_PATH_PIECE:
   case XREF_VALUE_PATH_PIECE: {
-    llvm::errs() << pathLen << " XREF_TYPE_PATH_PIECE\n";
     IdentifierID IID;
     IdentifierID privateDiscriminator = 0;
     TypeID TID = 0;
@@ -2009,13 +1976,10 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       auto maybeType = getTypeChecked(TID);
       if (!maybeType) {
         // Pass through deserialization errors.
-        if (maybeType.errorIsA<FatalDeserializationError>()) {
-          llvm::errs() << "ABC - 1\n";
+        if (maybeType.errorIsA<FatalDeserializationError>())
           return maybeType.takeError();
-      }
         // FIXME: Don't throw away the inner error's information.
         diagnoseAndConsumeError(maybeType.takeError());
-        llvm::errs() << "ABC - 2\n";
         return llvm::make_error<XRefError>("couldn't decode type",
                                            pathTrace, name);
       }
@@ -2033,14 +1997,10 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     }
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
                  importedFromClang, isStatic, std::nullopt, values);
-                  llvm::errs() << "ABC - ok - 1" << values.size () << "\n";
-                  if (!values.empty())
-                  values[0]->dump();
     break;
   }
       
   case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
-    llvm::errs() << "XREF_OPAQUE_RETURN_TYPE_PATH_PIECE\n";
     IdentifierID DefiningDeclNameID;
     
     XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
@@ -2058,7 +2018,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     llvm_unreachable("can only extend a nominal");
 
   case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE: {
-    llvm::errs() << "XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE\n";
     IdentifierID IID;
     uint8_t rawOpKind;
     XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, IID, rawOpKind);
@@ -2103,7 +2062,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
   default:
     // Unknown xref kind.
-    llvm::errs() << "unknown xref kind!\n";
     pathTrace.addUnknown(recordID);
     fatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
@@ -2295,12 +2253,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
     switch (recordID) {
     case XREF_TYPE_PATH_PIECE: {
-      llvm::errs() <<"path--XREF_TYPE_PATH_PIECE " << pathLen << "," << values.size() << "\n";
-      if (!values.empty()){
-        values[0]->dump();
-      }
       if (values.size() == 1 && isa<NominalTypeDecl>(values.front())) {
-        llvm::errs() << "XREF_TYPE_PATH_PIECE - pa\n";
         // Fast path for nested types that avoids deserializing all
         // members of the parent type.
         IdentifierID IID;
@@ -2354,9 +2307,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
             break;
           }
         }
-        llvm::errs() << "done here" << values.size () << "\n";
-        if (!values.empty())
-        values[0]->dump();
 
         pathTrace.removeLast();
       }
@@ -2365,7 +2315,6 @@ giveUpFastPath:
     }
     case XREF_VALUE_PATH_PIECE:
     case XREF_INITIALIZER_PATH_PIECE: {
-      llvm::errs() << "XREF_VALUE_PATH_PIECE falling\n";
       TypeID TID = 0;
       DeclBaseName memberName;
       Identifier privateDiscriminator;
@@ -2376,19 +2325,16 @@ giveUpFastPath:
       bool isStatic = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
-        llvm::errs() << "sub XREF_TYPE_PATH_PIECE\n" ; 
         IdentifierID IID, discriminatorID;
         XRefTypePathPieceLayout::readRecord(scratch, IID, discriminatorID,
                                             inProtocolExt, importedFromClang);
         memberName = getDeclBaseName(IID);
         privateDiscriminator = getIdentifier(discriminatorID);
-        llvm::errs() << "mn:" << memberName.getIdentifier().str() << "\n";
         isType = true;
         break;
       }
 
       case XREF_VALUE_PATH_PIECE: {
-        llvm::errs() << "sub XREF_VALUE_PATH_PIECE\n" ; 
         IdentifierID IID;
         XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
                                              importedFromClang, isStatic);
@@ -2397,7 +2343,6 @@ giveUpFastPath:
       }
 
       case XREF_INITIALIZER_PATH_PIECE: {
-        llvm::errs() << "sub XREF_INITIALIZER_PATH_PIECE\n" ; 
         uint8_t kind;
         XRefInitializerPathPieceLayout::readRecord(scratch, TID, inProtocolExt,
                                                    importedFromClang, kind);
@@ -2455,28 +2400,7 @@ giveUpFastPath:
         break;
       }
 
-      if (importedFromClang &&
-          !privateDiscriminator.empty()) {
-        // This is a clang imported class template, that's
-        // serialized using original template name, and
-        // its USR that denotes the specific specialization.
-        auto members = nominal->lookupDirect(memberName);
-        for (const auto &m: members) {
-          if (!m->hasClangNode())
-            continue;
-          if (auto *ctd = dyn_cast<clang::ClassTemplateDecl>(m->getClangDecl())) {
-            for (const auto *spec: ctd->specializations()) {
-              llvm::SmallString<128> buffer;
-              clang::index::generateUSRForDecl(spec, buffer);
-              if (privateDiscriminator.str() == buffer) {
-                if (auto import =
-                  getContext().getClangModuleLoader()->importDeclDirectly(spec))
-                  values.push_back(cast<ValueDecl>(import));
-              }
-            }
-          }
-        }
-      } else if (!privateDiscriminator.empty()) {
+      if (!privateDiscriminator.empty()) {
         ModuleDecl *searchModule = M;
         if (!searchModule)
           searchModule = nominal->getModuleContext();
@@ -2484,13 +2408,7 @@ giveUpFastPath:
                                    privateDiscriminator);
 
       } else {
-        if (!memberName.isSpecial())
-        llvm::errs() << "lookup direct!" << memberName.getIdentifier().str() << "\n";
         auto members = nominal->lookupDirect(memberName);
-        if (members.empty()) {
-          llvm::errs() << "empty nd!\n";
-          nominal->dump();
-        }
         values.append(members.begin(), members.end());
       }
       filterValues(filterTy, M, genericSig, isType, inProtocolExt,
@@ -2650,19 +2568,12 @@ giveUpFastPath:
 
     std::optional<PrettyStackTraceModuleFile> traceMsg;
     if (M != getAssociatedModule()) {
-      if (M)
-      llvm::errs() << "M:" << M->getName().str() << "\n";
-      if (getAssociatedModule())
-      llvm::errs() << "A:" << getAssociatedModule()->getName().str() << "\n";
-      llvm::errs() << "ABC -M not assos mod \n";
-
       traceMsg.emplace("If you're seeing a crash here, check that your SDK "
                          "and dependencies match the versions used to build",
                        *this);
     }
 
     if (values.empty()) {
-       llvm::errs() << "ABC - result not found \n";
       return llvm::make_error<XRefError>("result not found", pathTrace,
                                          getXRefDeclNameForError());
     }
@@ -2676,14 +2587,11 @@ giveUpFastPath:
   // This catches the case where the last path piece we saw was an Extension
   // path piece, which is not a valid way to end a path. (Cross-references to
   // extensions are not allowed because they cannot be uniquely named.)
-  if (M) {
-    llvm::errs() << "ABC - diagnose fatal not M \n";
+  if (M)
     return diagnoseFatal();
-  }
 
   // When all is said and done, we should have a single value here to return.
   if (values.size() != 1) {
-     llvm::errs() << "ABC - result ambiguous \n";
     return llvm::make_error<XRefError>("result is ambiguous", pathTrace,
                                        getXRefDeclNameForError());
   }
@@ -5436,10 +5344,8 @@ Expected<Decl *>
 ModuleFile::getDeclChecked(
     DeclID DID,
     llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
-  if (DID == 0) {
-    llvm::errs() << "getDeclChecked-1\n";
+  if (DID == 0)
     return nullptr;
-  }
 
   assert(DID <= Decls.size() && "invalid decl ID");
   auto &declOrOffset = Decls[DID-1];
@@ -5448,18 +5354,14 @@ ModuleFile::getDeclChecked(
     ++NumDeclsLoaded;
     BCOffsetRAII restoreOffset(DeclTypeCursor);
     if (auto error =
-            diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(declOrOffset))) {
-              llvm::errs() << "getDeclChecked-2\n";
+            diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(declOrOffset)))
       return std::move(error);
-            }
 
     Expected<Decl *> deserialized =
       DeclDeserializer(*this, declOrOffset).getDeclCheckedImpl(
         matchAttributes);
-    if (!deserialized) {
-      llvm::errs() << "getDeclChecked-3\n";
+    if (!deserialized)
       return deserialized;
-    }
   } else if (matchAttributes) {
     // Decl was cached but we may need to filter it
     if (!matchAttributes(declOrOffset.get()->getAttrs()))
@@ -6379,19 +6281,15 @@ DeclDeserializer::getDeclCheckedImpl(
   llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
 
   auto commonError = deserializeDeclCommon();
-  if (commonError) {
-    llvm::errs() << "getDeclCheckedImpl-1\n";
+  if (commonError)
     return std::move(commonError);
-  }
 
   if (matchAttributes) {
     // Deserialize the full decl only if matchAttributes finds a match.
     DeclAttributes attrs = DeclAttributes();
     attrs.setRawAttributeChain(DAttrs);
-    if (!matchAttributes(attrs)) {
-      llvm::errs() << "getDeclCheckedImpl-2\n";
+    if (!matchAttributes(attrs))
       return llvm::make_error<DeclAttributesDidNotMatch>();
-    }
   }
 
   if (auto s = ctx.Stats)
@@ -6406,7 +6304,6 @@ DeclDeserializer::getDeclCheckedImpl(
   llvm::BitstreamEntry entry =
       MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
   if (entry.Kind != llvm::BitstreamEntry::Record) {
-    llvm::errs() << "getDeclCheckedImpl-3\n";
     // We don't know how to serialize decls represented by sub-blocks.
     return MF.diagnoseFatal();
   }
@@ -6431,9 +6328,8 @@ DeclDeserializer::getDeclCheckedImpl(
       setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(\
           declOrError.get(), DAttrs, diffAttrParamIndicesMap); \
     } \
-    if (!declOrError) {\
-    llvm::errs() << "getDeclCheckedImpl-4\n"; \
-      return declOrError; } \
+    if (!declOrError) \
+      return declOrError; \
     declOrOffset = declOrError.get(); \
     break; \
   }
@@ -6464,18 +6360,13 @@ DeclDeserializer::getDeclCheckedImpl(
 #undef CASE
 
   case decls_block::XREF: {
-
-    llvm::errs() << "xref xref\n";
     assert(DAttrs == nullptr);
     ModuleID baseModuleID;
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
     auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
-    if (!resolved) {
-      llvm::errs() << baseModuleID << "\n";
-      llvm::errs() << "getDeclCheckedImpl-7\n";
+    if (!resolved)
       return resolved;
-    }
     declOrOffset = resolved.get();
     break;
   }
@@ -6486,10 +6377,8 @@ DeclDeserializer::getDeclCheckedImpl(
   }
 
   auto attrError = deserializeCustomAttrs();
-  if (attrError) {
-    llvm::errs() << "getDeclCheckedImpl-9\n";
+  if (attrError)
     return std::move(attrError);
-  }
   return declOrOffset;
 }
 
