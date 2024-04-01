@@ -935,6 +935,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setIsConcurrencyChecked();
     if (loadedModuleFile->hasCxxInteroperability())
       M.setHasCxxInteroperability();
+    if (loadedModuleFile->hasSealedCxxInteroperability())
+      M.setHasSealedCxxInteroperability();
     if (!loadedModuleFile->getModulePackageName().empty()) {
       M.setPackageName(Ctx.getIdentifier(loadedModuleFile->getModulePackageName()));
     }

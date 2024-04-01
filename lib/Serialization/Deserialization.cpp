@@ -8047,13 +8047,17 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
 
   SmallVector<Decl *, 16> members;
   members.reserve(rawMemberIDs.size());
+  // FIXME:
+  bool hasSealed = container->getModuleContext()->hasSealedCxxInteroperability();
+  llvm::errs() << "SEAL REPORT SIR:" << hasSealed << ",." << container->getModuleContext()->getName()  << "\n";
+  bool reportDeserializationErrors = (hasSealed && !isa<ClassDecl>(container)) || !getContext().LangOpts.EnableDeserializationRecovery;
   for (DeclID rawID : rawMemberIDs) {
     Expected<Decl *> next = getDeclChecked(rawID);
     if (next) {
       assert(next.get() && "unchecked error deserializing next member");
       members.push_back(next.get());
     } else {
-      if (!getContext().LangOpts.EnableDeserializationRecovery)
+      if (reportDeserializationErrors)
         fatal(next.takeError());
 
       Decl *suppliedMissingMember = handleErrorAndSupplyMissingMember(

@@ -386,6 +386,11 @@ public:
   void setBypassResilience() { BypassResilience = true; }
 
   ArrayRef<FileUnit *> getFiles() {
+    if (Files.empty()) {
+      if (!failedToLoad()) {
+        llvm::errs() << "oops haha" << getName().str() << "\n";
+      }
+    }
     assert(!Files.empty() || failedToLoad());
     return Files;
   }
@@ -687,6 +692,15 @@ public:
   }
   void setHasCxxInteroperability(bool enabled = true) {
     Bits.ModuleDecl.HasCxxInteroperability = enabled;
+  }
+
+  /// Returns true if this module was built with sealed C++ interoperability configuration,
+  /// that's broadly incompatible with default C++ interoperability support.
+  bool hasSealedCxxInteroperability() const {
+    return Bits.ModuleDecl.HasSealedCxxInteroperability;
+  }
+  void setHasSealedCxxInteroperability(bool enabled = true) {
+    Bits.ModuleDecl.HasSealedCxxInteroperability = enabled;
   }
 
   /// \returns true if this module is a system module; note that the StdLib is
