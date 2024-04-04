@@ -1492,22 +1492,9 @@ ClangImporter::create(ASTContext &ctx,
     assert(hasAdjusted && "unable to set custom c++ stdlib include path");
     // Recreate the header search info for the current instance to match
     // the updated header search options.
-    auto &headerSearchInfo = clangPP.getHeaderSearchInfo();
-    headerSearchInfo.SetSearchPaths({}, 0, 0, false, llvm::DenseMap<unsigned, unsigned>());
-    for (auto &E: instance.getHeaderSearchOpts().UserEntries) {
-      auto &fileMgr = instance.getFileManager();
-      auto optionalEntry = fileMgr.getOptionalDirectoryRef(E.Path);
-      if (!optionalEntry)
-        continue;
-      auto entry = *optionalEntry;
-      bool isSystem = E.Group >= clang::frontend::IncludeDirGroup::System;
-      auto kind = isSystem ? clang::SrcMgr::C_System : clang::SrcMgr::C_User;
-      if (isSystem)
-      headerSearchInfo.AddSystemSearchPath({entry, kind, (bool)E.IsFramework});
-      else
-      headerSearchInfo.AddSearchPath({entry, kind, (bool)E.IsFramework},
-                                    /*isAngled=*/E.Group == clang::frontend::IncludeDirGroup::Angled);
-    }
+    clang::ApplyHeaderSearchOptions(clangPP.getHeaderSearchInfo(),
+    instance.getHeaderSearchOpts(), instance.getLangOpts(), 
+    instance.getTarget().getTriple());
 
     if (importerOpts.DumpClangDiagnostics) {
       llvm::errs() << "Adjusted include paths to account for custom C++ stdlib:";
