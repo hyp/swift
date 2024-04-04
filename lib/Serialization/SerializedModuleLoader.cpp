@@ -1042,7 +1042,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   if (Ctx.LangOpts.EnableCXXInterop && 
       Ctx.LangOpts.isUsingCustomCxxStdLib() &&
       M.hasCxxInteroperability() &&
-      !M.hasSealedCxxInteroperability()) {
+      !M.hasSealedCxxInteroperability() &&
+      M.getName() != Ctx.Id_Cxx) {
     Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()), diag::need_custom_cxx_stdlib_to_import_module,
                        M.getName());
   }
