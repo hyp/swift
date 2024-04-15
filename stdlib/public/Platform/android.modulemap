@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 // The module map for the Android NDK.
-// The majority of the modules in this file are prefixed
+// A portion of the modules in this file are prefixed
 // with an underscore, to discourage users from importing them from
-// Swift directly. Instead, users should import 'Android' or another
+// Swift directly, as these modules might be overriden by the C++ stdlib.
+// Instead, users should import 'Android' or another
 // umbrella module that includes these headers.
 
 // The top level 'Android' module can be included from Swift.
@@ -94,6 +95,10 @@ module _signal [system] {
   // with 'sys/ucontext.h' and thus it must be part of this module.
   header "sys/ucontext.h"
   export *
+  explicit module bits_signaltypes {
+    header "bits/signal_types.h"
+    export *
+  }
 }
 module _stdatomic [system] {
   header "stdatomic.h"
@@ -106,10 +111,10 @@ module _stdint [system] {
 module _stdio [system] {
   header "stdio.h"
   export *
-}
-module _stdio_ext [system] {
-  header "stdio_ext.h"
-  export *
+  module stdio_ext {
+    header "stdio_ext.h"
+    export *
+  }
 }
 module _stdlib [system] {
   header "stdlib.h"
@@ -122,31 +127,28 @@ module _string [system] {
 module _time [system] {
   header "time.h"
   export *
-}
-module _utmp [system] {
-  module utmp {
-    header "utmp.h"
+  module sys_time {
+    header "sys/time.h"
     export *
   }
-  module utmpx {
-    header "utmpx.h"
+  module sys_times {
+    header "sys/times.h"
     export *
   }
-  export *
 }
 
 // POSIX and another android NDK headers.
-module _alloca [system] {
+module alloca [system] {
   header "alloca.h"
   export *
 }
 
-module _ar [system] {
+module ar [system] {
   header "ar.h"
   export *
 }
 
-module _cpio [system] {
+module cpio [system] {
   header "cpio.h"
   export *
 }
@@ -213,67 +215,112 @@ module posix_filesystem [system] {
   module utime {
     header "utime.h"
     export *
+  } 
+  module bits_ioctl {
+    header "bits/ioctl.h"
+    export *
+  }
+  module sys_epoll {
+    header "sys/epoll.h"
+    export *
+  }
+  module sys_eventfd {
+    header "sys/eventfd.h"
+    export *
+  }
+  module sys_file {
+    header "sys/file.h"
+    export *
+  }
+  module sys_inotify {
+    header "sys/inotify.h"
+    export *
+  }
+  module sys_ioctl {
+    header "sys/ioctl.h"
+    export *
+  }
+  module sys_mount {
+    header "sys/mount.h"
+    export *
+  }
+  module sys_sendfile {
+    header "sys/sendfile.h"
+    export *
+  }
+  module sys_stat {
+    header "sys/stat.h"
+    export *
+  }
+  module sys_statvfs {
+    header "sys/statvfs.h"
+    export *
+  }
+  module sys_vfs {
+    header "sys/vfs.h"
+    export *
+  }
+  module sys_uio {
+    header "sys/uio.h"
+    export *
   }
   export *
 }
 
-module _dl [system] {
+module dl [system] {
   // This module groups all dl* based operations
   // into one module.
   module dlfcn {
     header "dlfcn.h"
     export *
   }
-  module _link {
+  module link_ {
     header "link.h"
     export *
   }
   export *
 }
 
-module _error [system] {
+module error [system] {
+  header "error.h"
+  export *
   module err {
     header "err.h"
     export *
   }
-  module error {
-    header "error.h"
-    export *
-  }
-  export *
 }
 
-module _execinfo [system] {
+module execinfo [system] {
   header "execinfo.h"
   export *
 }
 
-module _features [system] {
+module features [system] {
   header "features.h"
   export *
 }
 
-module _ftw [system] {
+module ftw [system] {
   header "ftw.h"
   export *
 }
 
-module _getopt [system] {
+module getopt [system] {
   header "getopt.h"
   export *
 }
 
-module _grp [system] {
+module grp [system] {
   header "grp.h"
   export *
 }
 
-module _iconv [system] {
+module iconv [system] {
   header "iconv.h"
   export *
 }
 
-module _inet [system] {
+module inet [system] {
   // This module groups headers related to inet
   // and networking.
   module ifaddrs {
@@ -296,60 +343,80 @@ module _inet [system] {
     header "netinet/in6.h"
     export *
   }
+  module bits_ip_mreq_source {
+    header "bits/ip_mreq_source.h"
+    export *
+  }
+  module bits_ip_msfilter {
+    header "bits/ip_msfilter.h"
+    export *
+  }
+  module bits_in_addr {
+    header "bits/in_addr.h"
+    export *
+  }
+  module linux_if {
+    header "linux/if.h"
+    export *
+  }
+  module sys_socket {
+    header "sys/socket.h"
+    export *
+  }
   export *
 }
 
-module _jni [system] {
+module jni [system] {
   header "jni.h"
   export *
 }
 
-module _langinfo [system] {
+module langinfo [system] {
   header "langinfo.h"
   export *
 }
 
-module _pthread [system] {
+module pthread [system] {
   header "pthread.h"
   export *
 }
 
-module _regex [system] {
+module regex [system] {
   header "regex.h"
   export *
 }
 
-module _resolv [system] {
+module resolv [system] {
   header "resolv.h"
   export *
 }
 
-module _sched [system] {
+module sched [system] {
   header "sched.h"
   export *
 }
 
-module _search [system] {
+module search [system] {
   header "search.h"
   export *
 }
 
-module _semaphore [system] {
+module semaphore [system] {
   header "semaphore.h"
   export *
 }
 
-module _spawn [system] {
+module spawn [system] {
   header "spawn.h"
   export *
 }
 
-module _strings [system] {
+module strings [system] {
   header "strings.h"
   export *
 }
 
-module _sys [system] {
+module sys [system] {
   module syscall {
     header "syscall.h"
     export *
@@ -365,12 +432,12 @@ module _sys [system] {
   export *
 }
 
-module _tar [system] {
+module tar [system] {
   header "tar.h"
   export *
 }
 
-module _termio [system] {
+module termio [system] {
   module termio {
     header "termio.h"
     export *
@@ -382,7 +449,7 @@ module _termio [system] {
   export *
 }
 
-module _threads [system] {
+module threads [system] {
   header "threads.h"
   export *
   explicit module threads_inlines {
@@ -391,17 +458,34 @@ module _threads [system] {
   }
 }
 
-module _uconfig_local [system] {
+module uconfig_local [system] {
   header "uconfig_local.h"
   export *
 }
 
-module _ucontext [system] {
+module ucontext [system] {
   header "ucontext.h"
   export *
 }
 
-module _wait [system] {
+module _uchar [system] {
+  header "uchar.h"
+  export *
+}
+
+module utmp [system] {
+  module utmp {
+    header "utmp.h"
+    export *
+  }
+  module utmpx {
+    header "utmpx.h"
+    export *
+  }
+  export *
+}
+
+module wait [system] {
   header "wait.h"
   export *
   explicit module sys_wait {
@@ -410,29 +494,22 @@ module _wait [system] {
   }
 }
 
-module _wchar_uchar [system] {
-  module uchar {
-    header "uchar.h"
-    export *
-  }
-  module wchar {
-    header "wchar.h"
-    export *
-  }
+module _wchar [system] {
+  header "wchar.h"
+  export *
   explicit module mbstate_t {
     header "bits/mbstate_t.h"
     export *
   }
-  export *
 }
 
-module _xlocale [system] {
+module xlocale [system] {
   header "xlocale.h"
   export *
 }
 
 // Additional modules in the 'android' subdirectory.
-module _android_defs [system] {
+module android_defs [system] {
   module ndk_version {
     header "android/ndk-version.h"
     export *
@@ -444,7 +521,7 @@ module _android_defs [system] {
   export *
 }
 
-module _android_apis [system] {
+module android_apis [system] {
   module asset_manager_jni {
     header "android/asset_manager_jni.h"
     export *
@@ -465,46 +542,33 @@ module _android_apis [system] {
 }
 
 // Additional modules in the 'bits' subdirectory.
-module _bits_io_inet [system] {
-  module in_addr {
-    header "bits/in_addr.h"
-    export *
-  }
-  module ioctl {
-    header "bits/ioctl.h"
-    export *
-  }
-  module ip_mreq_source {
-    header "bits/ip_mreq_source.h"
-    export *
-  }
-  module ip_msfilter {
-    header "bits/ip_msfilter.h"
-    export *
-  }
-  module sa_family_t {
-    header "bits/sa_family_t.h"
-    export *
-  }
-  export *
-}
-module _bits_signaltypes [system] {
-  header "bits/signal_types.h"
+module _bits_sa_family_t [system] {
+  // Note: this module is not part of 'inet'
+  // to prevent a circular modular dependency. 
+  header "bits/sa_family_t.h"
   export *
 }
 module _bits_stdatomic [system] {
+  // Note: this module is not part of 'stdatomic'
+  // as it depends on libc++ and forcing it to
+  // be in the same module breaks that modularization
+  // chain.
   header "bits/stdatomic.h"
-  export *
-}
-module _bits_timespec [system] {
-  header "bits/timespec.h"
   export *
 }
 
 // Additional modules in the 'linux' subdirectory.
-module _linux_inet [system] {
-  header "linux/if.h"
+module _linux_time [system] {
+  // Note: this module is not part of '_time'
+  // to prevent a circular modular dependency
+  // between linux_time and sys modules.
+  header "linux/time.h"
+  header "linux/time_types.h"
   export *
+  explicit module bits_timespec {
+    header "bits/timespec.h"
+    export *
+  }
 }
 
 // Additional modules in the 'sys' subdirectory.
@@ -520,32 +584,12 @@ module _sys_core [system] {
     header "sys/endian.h"
     export *
   }
-  module epoll {
-    header "sys/epoll.h"
-    export *
-  }
   module errno {
     header "sys/errno.h"
     export *
   }
-  module eventfd {
-    header "sys/eventfd.h"
-    export *
-  }
-  module file {
-    header "sys/file.h"
-    export *
-  }
   module ifunc {
     header "sys/ifunc.h"
-    export *
-  }
-  module inotify {
-    header "sys/inotify.h"
-    export *
-  }
-  module ioctl {
-    header "sys/ioctl.h"
     export *
   }
   module ipc {
@@ -554,10 +598,6 @@ module _sys_core [system] {
   }
   module mman {
     header "sys/mman.h"
-    export *
-  }
-  module mount {
-    header "sys/mount.h"
     export *
   }
   module msg {
@@ -576,28 +616,8 @@ module _sys_core [system] {
     header "sys/sem.h"
     export *
   }
-  module sendfile {
-    header "sys/sendfile.h"
-    export *
-  }
   module shm {
     header "sys/shm.h"
-    export *
-  }
-  module socket {
-    header "sys/socket.h"
-    export *
-  }
-  module stat {
-    header "sys/stat.h"
-    export *
-  }
-  module statvfs {
-    header "sys/statvfs.h"
-    export *
-  }
-  module uio {
-    header "sys/uio.h"
     export *
   }
   module un {
@@ -608,28 +628,19 @@ module _sys_core [system] {
     header "sys/utsname.h"
     export *
   }
-  module vfs {
-    header "sys/vfs.h"
-    export *
-  }
   export *
 }
 module _sys_select [system] {
+  // Note: this module is not part of 
+  // 'sys_core' to prevent circular dependency error.
   header "sys/select.h"
   export *
 }
-module _sys_time [system] {
-  module time {
-    header "sys/time.h"
-    export *
-  }
-  module times {
-    header "sys/times.h"
-    export *
-  }
-  export *
-}
-// Use 'no_undeclared_includes' to avoid pulling in the libc++ headers. 
+// Use 'no_undeclared_includes' to avoid pulling in the libc++ module.
+// This module depends on 'stdint.h', which is defined in libc++.
+// We can't import libc++ as that would cause circular dependency
+// between libc++ and this module. Using 'no_undeclared_includes'
+// ensures that we include 'stdint.h' from usr/include instead of libc++.
 module _sys_types [system] [no_undeclared_includes] {
   header "sys/types.h"
   // The 'sys/types.h' header has a circular include
@@ -640,7 +651,11 @@ module _sys_types [system] [no_undeclared_includes] {
   use _sys_cdefs
   use _Builtin_stddef
 }
-// Use 'no_undeclared_includes' to avoid pulling in the libc++ headers. 
+// Use 'no_undeclared_includes' to avoid pulling in the libc++ module.
+// This module depends on 'stdint.h', which is defined in libc++.
+// We can't import libc++ as that would cause circular dependency
+// between libc++ and this module. Using 'no_undeclared_includes'
+// ensures that we include 'stdint.h' from usr/include instead of libc++.
 module _sys_user [system] [no_undeclared_includes]  {
   header "sys/user.h"
   export *
