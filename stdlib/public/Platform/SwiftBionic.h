@@ -22,7 +22,6 @@
 #include <locale.h>
 #include <malloc.h>
 #include <math.h>
-#include <pty.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <stdatomic.h>
@@ -32,6 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <utmp.h>
+#include <threads.h>
+#include <uchar.h>
+#include <wchar.h>
 
 #endif // SWIFT_BIONIC_MODULE

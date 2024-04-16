@@ -81,10 +81,6 @@ module _math [system] {
   export *
   link "m"
 }
-module _pty [system] {
-  header "pty.h"
-  export *
-}
 module _setjmp [system] {
   header "setjmp.h"
   export *
@@ -111,7 +107,7 @@ module _stdint [system] {
 module _stdio [system] {
   header "stdio.h"
   export *
-  module stdio_ext {
+  explicit module stdio_ext {
     header "stdio_ext.h"
     export *
   }
@@ -124,15 +120,35 @@ module _string [system] {
   header "string.h"
   export *
 }
+module _threads [system] {
+  header "threads.h"
+  export *
+  explicit module threads_inlines {
+    header "bits/threads_inlines.h"
+    export *
+  }
+}
 module _time [system] {
   header "time.h"
   export *
-  module sys_time {
+  explicit module sys_time {
     header "sys/time.h"
     export *
   }
-  module sys_times {
+  explicit module sys_times {
     header "sys/times.h"
+    export *
+  }
+}
+module _uchar [system] {
+  header "uchar.h"
+  export *
+}
+module _wchar [system] {
+  header "wchar.h"
+  export *
+  explicit module mbstate_t {
+    header "bits/mbstate_t.h"
     export *
   }
 }
@@ -156,115 +172,110 @@ module cpio [system] {
 module posix_filesystem [system] {
   // This module groups all file, paths and filesystem
   // operations into one module.
-  module dirent {
+  explicit module dirent {
     header "dirent.h"
     export *
   }
-  module fcntl {
+  explicit module fcntl {
     header "fcntl.h"
     export *
-    explicit module sys_fcntl {
-      header "sys/fcntl.h"
-      export *
-    }
   }
-  module fnmatch {
+  explicit module fnmatch {
     header "fnmatch.h"
     export *
   }
-  module fts {
+  explicit module fts {
     header "fts.h"
     export *
   }
-  module glob {
+  explicit module ftw {
+    header "ftw.h"
+    export *
+  }
+  explicit module glob {
     header "glob.h"
     export *
   }
-  module mntent {
+  explicit module mntent {
     header "mntent.h"
     export *
   }
-  module libgen {
+  explicit module libgen {
     header "libgen.h"
     export *
   }
-  module nl_types {
+  explicit module nl_types {
     header "nl_types.h"
     export *
   }
-  module paths {
+  explicit module paths {
     header "paths.h"
     export *
   }
-  module poll {
+  explicit module poll {
     header "poll.h"
     export *
   }
-  module pwd {
+  explicit module pwd {
     header "pwd.h"
     export *
   }
-  module unistd {
-    header "unistd.h"
-    export *
-    explicit module sys_unistd {
-      header "sys/unistd.h"
-      export *
-    }
-  }
-  module utime {
+  explicit module utime {
     header "utime.h"
     export *
   } 
-  module bits_ioctl {
+  explicit module bits_ioctl {
     header "bits/ioctl.h"
     export *
   }
-  module sys_epoll {
+  explicit module sys_epoll {
     header "sys/epoll.h"
     export *
   }
-  module sys_eventfd {
+  explicit module sys_eventfd {
     header "sys/eventfd.h"
     export *
   }
-  module sys_file {
+  explicit module sys_fcntl {
+    header "sys/fcntl.h"
+    export *
+  }
+  explicit module sys_file {
     header "sys/file.h"
     export *
   }
-  module sys_inotify {
+  explicit module sys_inotify {
     header "sys/inotify.h"
     export *
   }
-  module sys_ioctl {
+  explicit module sys_ioctl {
     header "sys/ioctl.h"
     export *
   }
-  module sys_mount {
+  explicit module sys_mount {
     header "sys/mount.h"
     export *
   }
-  module sys_sendfile {
+  explicit module sys_sendfile {
     header "sys/sendfile.h"
     export *
   }
-  module sys_stat {
+  explicit module sys_stat {
     header "sys/stat.h"
     export *
   }
-  module sys_statvfs {
+  explicit module sys_statvfs {
     header "sys/statvfs.h"
     export *
   }
-  module sys_vfs {
+  explicit module sys_vfs {
     header "sys/vfs.h"
     export *
   }
-  module sys_uio {
+  explicit module sys_uio {
     header "sys/uio.h"
     export *
   }
-  export *
 }
 
 module dl [system] {
@@ -278,7 +289,6 @@ module dl [system] {
     header "link.h"
     export *
   }
-  export *
 }
 
 module error [system] {
@@ -300,11 +310,6 @@ module features [system] {
   export *
 }
 
-module ftw [system] {
-  header "ftw.h"
-  export *
-}
-
 module getopt [system] {
   header "getopt.h"
   export *
@@ -323,47 +328,46 @@ module iconv [system] {
 module inet [system] {
   // This module groups headers related to inet
   // and networking.
-  module ifaddrs {
+  explicit module ifaddrs {
     header "ifaddrs.h"
     export *
   }
-  module netdb {
+  explicit module netdb {
     header "netdb.h"
     export *
   }
-  module arpa_inet {
+  explicit module arpa_inet {
     header "arpa/inet.h"
     export *
   }
-  module netinet_in {
+  explicit module netinet_in {
     header "netinet/in.h"
     export *
   }
-  module netinet_in6 {
+  explicit module netinet_in6 {
     header "netinet/in6.h"
     export *
   }
-  module bits_ip_mreq_source {
+  explicit module bits_ip_mreq_source {
     header "bits/ip_mreq_source.h"
     export *
   }
-  module bits_ip_msfilter {
+  explicit module bits_ip_msfilter {
     header "bits/ip_msfilter.h"
     export *
   }
-  module bits_in_addr {
+  explicit module bits_in_addr {
     header "bits/in_addr.h"
     export *
   }
-  module linux_if {
+  explicit module linux_if {
     header "linux/if.h"
     export *
   }
-  module sys_socket {
+  explicit module sys_socket {
     header "sys/socket.h"
     export *
   }
-  export *
 }
 
 module jni [system] {
@@ -378,6 +382,11 @@ module langinfo [system] {
 
 module pthread [system] {
   header "pthread.h"
+  export *
+}
+
+module pty [system] {
+  header "pty.h"
   export *
 }
 
@@ -429,7 +438,6 @@ module sys [system] {
     header "syslog.h"
     export *
   }
-  export *
 }
 
 module tar [system] {
@@ -446,16 +454,6 @@ module termio [system] {
     header "termios.h"
     export *
   }
-  export *
-}
-
-module threads [system] {
-  header "threads.h"
-  export *
-  explicit module threads_inlines {
-    header "bits/threads_inlines.h"
-    export *
-  }
 }
 
 module uconfig_local [system] {
@@ -468,9 +466,13 @@ module ucontext [system] {
   export *
 }
 
-module _uchar [system] {
-  header "uchar.h"
+module unistd [system] {
+  header "unistd.h"
   export *
+  explicit module sys_unistd {
+    header "sys/unistd.h"
+    export *
+  }
 }
 
 module utmp [system] {
@@ -482,7 +484,6 @@ module utmp [system] {
     header "utmpx.h"
     export *
   }
-  export *
 }
 
 module wait [system] {
@@ -490,15 +491,6 @@ module wait [system] {
   export *
   explicit module sys_wait {
     header "sys/wait.h"
-    export *
-  }
-}
-
-module _wchar [system] {
-  header "wchar.h"
-  export *
-  explicit module mbstate_t {
-    header "bits/mbstate_t.h"
     export *
   }
 }
@@ -518,7 +510,6 @@ module android_defs [system] {
     header "android/versioning.h"
     export *
   }
-  export *
 }
 
 module android_apis [system] {
@@ -538,7 +529,6 @@ module android_apis [system] {
     header "android/trace.h"
     export *
   }
-  export *
 }
 
 // Additional modules in the 'bits' subdirectory.
@@ -628,7 +618,6 @@ module _sys_core [system] {
     header "sys/utsname.h"
     export *
   }
-  export *
 }
 module _sys_select [system] {
   // Note: this module is not part of 

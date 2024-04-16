@@ -22,7 +22,6 @@
 #include <locale.h>
 #include <malloc.h>
 #include <math.h>
-#include <pty.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <stdatomic.h>
@@ -32,7 +31,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <utmp.h>
+#include <threads.h>
+#include <uchar.h>
+#include <wchar.h>
 
 #include <alloca.h>
 #include <ar.h>
@@ -62,6 +63,7 @@
 #include <paths.h>
 #include <poll.h>
 #include <pthread.h>
+#include <pty.h>
 #include <pwd.h>
 #include <regex.h>
 #include <resolv.h>
@@ -76,8 +78,6 @@
 #include <tar.h>
 #include <termio.h>
 #include <termios.h>
-#include <threads.h>
-#include <uchar.h>
 #include <uconfig_local.h>
 #include <ucontext.h>
 #include <unistd.h>
@@ -85,7 +85,6 @@
 #include <utmp.h>
 #include <utmpx.h>
 #include <wait.h>
-#include <wchar.h>
 #include <xlocale.h>
 
 #include <arpa/inet.h>
