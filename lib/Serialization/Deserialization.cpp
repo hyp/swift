@@ -8074,7 +8074,7 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   // FIXME:
   bool hasSealed = container->getModuleContext()->hasSealedCxxInteroperability();
   llvm::errs() << "SEAL REPORT SIR:" << hasSealed << ",." << container->getModuleContext()->getName()  << "\n";
-  bool reportDeserializationErrors = (hasSealed && !isa<ClassDecl>(container)) || !getContext().LangOpts.EnableDeserializationRecovery;
+  bool reportDeserializationErrors = hasSealed || !getContext().LangOpts.EnableDeserializationRecovery;
   for (DeclID rawID : rawMemberIDs) {
     Expected<Decl *> next = getDeclChecked(rawID);
     if (next) {
