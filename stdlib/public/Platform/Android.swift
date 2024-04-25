@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import Android // Clang module
+@_exported import SwiftAndroid // Clang module
 
 @available(swift, deprecated: 3.0, message: "Please use 'Double.pi' or '.pi' to get the value of correct type and avoid casting.")
 public let M_PI = Double.pi
@@ -83,6 +83,6 @@ public let DBL_MIN = Double.leastNormalMagnitude
 @available(swift, deprecated: 3.0, message: "Please use 'Double.leastNonzeroMagnitude' or '.leastNonzeroMagnitude'.")
 public let DBL_TRUE_MIN = Double.leastNonzeroMagnitude
 
-public let M_LN2 = Android.M_LN2
-public let M_LOG10E = Android.M_LOG10E
-public let M_2_SQRTPI = Android.M_2_SQRTPI
+public let M_LN2 = SwiftAndroid.M_LN2
+public let M_LOG10E = SwiftAndroid.M_LOG10E
+public let M_2_SQRTPI = SwiftAndroid.M_2_SQRTPI
