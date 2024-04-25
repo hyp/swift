@@ -17,7 +17,7 @@
 // umbrella module that includes these headers.
 
 // The top level 'Android' module can be included from Swift.
-module Android [system] {
+module SwiftAndroid [system] {
   header "SwiftAndroidNDK.h"
   export *
 }
