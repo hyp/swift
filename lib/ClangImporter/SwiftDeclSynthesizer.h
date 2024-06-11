@@ -319,6 +319,8 @@ public:
   /// method that dispatches the call dynamically.
   FuncDecl *makeVirtualMethod(const clang::CXXMethodDecl *clangMethodDecl);
 
+  FuncDecl *makeInstanceToStaticOperatorCallMethod(const clang::CXXMethodDecl *clangMethodDecl);
+
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);
 
