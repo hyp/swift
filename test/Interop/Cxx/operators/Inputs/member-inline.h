@@ -477,4 +477,14 @@ struct HasOperatorCallWithDefaultArg {
   int operator()(int x = 0) const { return value + x; }
 };
 
+class HasStaticOperatorCallBase {
+public:
+    static int operator()(int x) {
+        return x + 42;
+    }
+};
+
+class HasStaticOperatorCallDerived: public HasStaticOperatorCallBase {
+};
+
 #endif

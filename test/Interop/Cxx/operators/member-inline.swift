@@ -437,4 +437,16 @@ OperatorsTestSuite.test("HasOperatorCallWithDefaultArg.call") {
   expectEqual(444, res)
 }
 
+OperatorsTestSuite.test("HasStaticOperatorCallBase.call") {
+  let h = HasStaticOperatorCallBase()
+  let res = h(1)
+  expectEqual(43, res)
+}
+
+OperatorsTestSuite.test("HasStaticOperatorCallDerived.call") {
+  let h = HasStaticOperatorCallDerived()
+  let res = h(0)
+  expectEqual(42, res)
+}
+
 runAllTests()
