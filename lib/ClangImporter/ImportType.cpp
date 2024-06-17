@@ -2223,6 +2223,22 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   if (auto elaborated =
           dyn_cast<clang::ElaboratedType>(returnType))
     returnType = elaborated->desugar();
+  // In C interop mode, the return type of builtin functions like 'memcpy' drops any nullability
+  // specifiers from their return type, and preserves it on the declared return type. Thus, in C
+  // mode the imported return type of such functions is always optional. However, in C++ interop mode, the
+  // return type of builtin functions can preseve the nullability specifiers on their return type,
+  // and thus the imported return type of such functions can be non-optional, if the type is annotated with
+  // `_Nonnull`. The difference between these two modes can break cross-module Swift serialization, as
+  // Swift will no longer be able to resolve an x-ref such as 'memcpy' from a Swift module that uses
+  // C interop, within a Swift context that uses C++ interop. In order to avoid the x-ref resolution
+  // failure, normalize the return type's nullability for builtin functions in C++ interop mode, to
+  // match the imported type in C interop mode.
+  if (SwiftContext.LangOpts.EnableCXXInterop && 
+      clangDecl->getBuiltinID() &&
+      isa<clang::AttributedType>(returnType)) {
+    if (cast<clang::AttributedType>(returnType)->getImmediateNullability())
+      clang::AttributedType::stripOuterNullability(returnType);
+  }
 
   // Specialized templates need to match the args/result exactly (i.e.,
   // ptr -> ptr not ptr -> Optional<ptr>).
