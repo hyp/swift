@@ -2033,23 +2033,6 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     if (privateDiscriminator) {
       baseModule->lookupMember(values, baseModule, name,
                                getIdentifier(privateDiscriminator));
-    } else if (isSynthesized && importedFromClang) {
-      ValueDecl *synthesizedResult = nullptr;
-      if (name.isOperator() && filterTy) {
-        // This is a Clang-importer synthesized conformance operator. Resolve it
-        // using clang importer lookup logic for the given type.
-        if (auto *fty = dyn_cast<AnyFunctionType>(filterTy.getPointer())) {
-          if (fty->getNumParams()) {
-            auto p = fty->getParams()[0].getParameterType();
-            if (auto sty = dyn_cast<NominalType>(p.getPointer())) 
-               synthesizedResult = importer::getSynthesizedConformanceOperator(name, sty->getDecl(), fty->getNumParams() > 1 ? fty->getParams()[1].getParameterType() : std::optional<Type>{});
-          }
-        }
-      }
-      if (!synthesizedResult)
-        return llvm::make_error<XRefError>("couldn't find synthesized clang value decl x-ref",
-                                           pathTrace, name);
-      values.push_back(synthesizedResult);
     } else {
       baseModule->lookupQualified(baseModule, DeclNameRef(name),
                                   SourceLoc(), NL_QualifiedDefault,
@@ -2057,6 +2040,20 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     }
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
                  importedFromClang, isStatic, std::nullopt, values);
+    if (values.empty() && 
+        importedFromClang && name.isOperator() && filterTy) {
+      // This could be a Clang-importer synthesized conformance operator. Attempt
+      // to resolve it using clang importer lookup logic for the given type.
+      if (auto *fty = dyn_cast<AnyFunctionType>(filterTy.getPointer())) {
+        if (fty->getNumParams()) {
+          auto p = fty->getParams()[0].getParameterType();
+          if (auto sty = dyn_cast<NominalType>(p.getPointer())) {
+            if (auto *synthesizedResult = importer::getSynthesizedConformanceOperator(name, sty->getDecl(), fty->getNumParams() > 1 ? fty->getParams()[1].getParameterType() : std::optional<Type>{})) 
+              values.push_back(synthesizedResult);
+          }
+        }
+      }      
+    }
     break;
   }
       
